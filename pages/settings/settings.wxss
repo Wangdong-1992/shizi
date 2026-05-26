@@ -1,0 +1,46 @@
+page {
+  background: linear-gradient(180deg, #E8F4FD 0%, #FDF6EC 100%);
+  min-height: 100vh;
+}
+
+.container {
+  padding: 32rpx;
+}
+
+.settings-list {
+  background: white;
+  border-radius: 32rpx;
+  overflow: hidden;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 40rpx 32rpx;
+  border-bottom: 1rpx solid #f5f7fa;
+}
+
+.settings-item:last-child {
+  border-bottom: none;
+}
+
+.settings-label {
+  font-size: 32rpx;
+  color: #333;
+}
+
+.settings-arrow {
+  font-size: 40rpx;
+  color: #ccc;
+}
+
+.settings-item.logout {
+  justify-content: center;
+}
+
+.logout-text {
+  font-size: 32rpx;
+  color: #ff4d4f;
+}

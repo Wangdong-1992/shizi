@@ -1,7 +1,7 @@
 <view class="container">
   <!-- 用户信息卡片 -->
   <view class="profile-card">
-    <button class="settings-btn" bindtap="goBack">⚙️</button>
+    <button class="settings-btn" bindtap="goToSettings">⚙️</button>
     <view class="avatar">{{userInfo.avatar || '👶'}}</view>
     <view class="user-details">
       <text class="nickname">{{userInfo.nickname || '小明'}}</text>
