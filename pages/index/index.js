@@ -25,11 +25,13 @@ Page({
     // 检查本地是否有登录标识（openid）
     const openid = app.globalData.openid;
     if (openid) {
-      // 已登录，加载数据
+      // 已登录，显示tabbar，加载数据
+      wx.showTabBar();
       this.setData({ isLoggedIn: true });
       this.loadIndexData();
     } else {
-      // 未登录，显示登录页
+      // 未登录，隐藏tabbar，显示登录页
+      wx.hideTabBar();
       this.setData({ isLoggedIn: false, loading: false });
     }
   },
