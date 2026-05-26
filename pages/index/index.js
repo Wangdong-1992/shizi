@@ -21,11 +21,16 @@ Page({
     this.checkLoginStatus();
   },
 
+  onHide() {
+    // 离开页面时恢复tabbar（避免影响其他页面）
+    wx.showTabBar();
+  },
+
   checkLoginStatus() {
     // 检查本地是否有登录标识（openid）
     const openid = app.globalData.openid;
     if (openid) {
-      // 已登录，显示tabbar，加载数据
+      // 已登录，加载数据
       wx.showTabBar();
       this.setData({ isLoggedIn: true });
       this.loadIndexData();
