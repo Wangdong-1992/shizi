@@ -4,7 +4,8 @@
     "pages/learn/learn",
     "pages/review/review",
     "pages/profile/profile",
-    "pages/mastered/mastered"
+    "pages/mastered/mastered",
+    "pages/settings/settings"
   ],
   "window": {
     "navigationBarTitleText": "儿童识字",

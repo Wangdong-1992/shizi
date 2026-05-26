@@ -1,0 +1,11 @@
+<view class="container">
+  <view class="settings-list">
+    <view class="settings-item" bindtap="showAbout">
+      <text class="settings-label">关于我们</text>
+      <text class="settings-arrow">›</text>
+    </view>
+    <view class="settings-item logout" bindtap="logout">
+      <text class="logout-text">退出登录</text>
+    </view>
+  </view>
+</view>

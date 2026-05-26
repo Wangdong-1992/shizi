@@ -80,5 +80,9 @@ Page({
 
   goBack() {
     wx.switchTab({ url: '/pages/index/index' });
+  },
+
+  goToSettings() {
+    wx.navigateTo({ url: '/pages/settings/settings' });
   }
 });
