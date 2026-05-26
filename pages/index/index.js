@@ -47,6 +47,7 @@ Page({
 
     try {
       const openid = await app.getOpenid();
+      wx.showTabBar(); // 登录后显示tabbar
       this.setData({ isLoggedIn: true });
       wx.hideLoading();
       this.loadIndexData();
@@ -93,6 +94,7 @@ Page({
       });
     } catch (err) {
       console.error('加载首页数据失败:', err);
+      wx.showTabBar(); // 确保失败时也显示tabbar
       this.setData({ loading: false });
     }
   },
