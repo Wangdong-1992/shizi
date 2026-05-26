@@ -1,0 +1,53 @@
+<view class="container">
+  <!-- 用户信息卡片 -->
+  <view class="profile-card">
+    <button class="settings-btn" bindtap="goBack">⚙️</button>
+    <view class="avatar">{{userInfo.avatar || '👶'}}</view>
+    <view class="user-details">
+      <text class="nickname">{{userInfo.nickname || '小明'}}</text>
+      <text class="join-date">加入于 {{joinDate}}</text>
+    </view>
+  </view>
+
+  <!-- 学习统计 -->
+  <view class="stats-card">
+    <text class="section-title">📊 学习统计</text>
+    <view class="stats-grid">
+      <view class="stat-item">
+        <text class="stat-value">{{stats.mastered_count}}</text>
+        <text class="stat-label">已掌握</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{stats.star_count}}</text>
+        <text class="stat-label">星星</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{stats.flower_count}}</text>
+        <text class="stat-label">小红花</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{stats.streak_count}}</text>
+        <text class="stat-label">连续天数</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 成就展示 -->
+  <view class="achievement-card">
+    <text class="section-title">🏆 成就展示</text>
+    <view class="achievement-grid">
+      <view wx:for="{{achievements.achievements || []}}" wx:key="id" class="achievement-item {{item.unlocked ? 'unlocked' : 'locked'}}">
+        <view class="achievement-icon">{{item.unlocked ? item.icon : '🔒'}}</view>
+        <text class="achievement-name">{{item.name}}</text>
+        <view wx:if="{{!item.unlocked}}" class="progress-bar">
+          <view class="progress-fill" style="width: {{item.progress}}%"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+</view>

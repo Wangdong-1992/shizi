@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@cloudbase/database": "^1.4.3",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "canvas": "^3.2.3"
+  }
+}

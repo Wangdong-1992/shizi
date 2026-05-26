@@ -1,0 +1,9 @@
+{
+  "envId": "cloud1-d7geippqn581097e3",
+  "functionMetas": [
+    {
+      "name": "fixData",
+      "timeout": 60
+    }
+  ]
+}

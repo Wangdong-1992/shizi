@@ -1,0 +1,9 @@
+{
+  "name": "fixData",
+  "version": "1.0.0",
+  "description": "修复 mastered_chars 重复数据",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

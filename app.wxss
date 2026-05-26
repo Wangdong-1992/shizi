@@ -1,0 +1,79 @@
+/* 全局样式 */
+page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #F5F7FA;
+  font-size: 28rpx;
+  color: #333;
+}
+
+/* 通用工具类 */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-sm { gap: 16rpx; }
+.gap-md { gap: 24rpx; }
+.gap-lg { gap: 32rpx; }
+
+.mt-sm { margin-top: 16rpx; }
+.mt-md { margin-top: 24rpx; }
+.mt-lg { margin-top: 32rpx; }
+.mb-sm { margin-bottom: 16rpx; }
+.mb-md { margin-bottom: 24rpx; }
+.mb-lg { margin-bottom: 32rpx; }
+
+.text-center { text-align: center; }
+.text-primary { color: #4A90D9; }
+.text-secondary { color: #666; }
+.text-lg { font-size: 36rpx; }
+.text-xl { font-size: 48rpx; }
+.text-bold { font-weight: bold; }
+
+/* 卡片样式 */
+.card {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  margin: 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
+}
+
+/* 按钮样式 */
+.btn {
+  background: linear-gradient(135deg, #4A90D9 0%, #7AB3ED 100%);
+  color: #fff;
+  border-radius: 40rpx;
+  padding: 24rpx 48rpx;
+  font-size: 32rpx;
+  font-weight: bold;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+}
+
+.btn:active { opacity: 0.9; transform: scale(0.98); }
+
+.btn-secondary {
+  background: linear-gradient(135deg, #FF9F43 0%, #FFB976 100%);
+  box-shadow: 0 8rpx 24rpx rgba(255, 159, 67, 0.4);
+}
+
+/* 加载动画 */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx;
+}
+
+.loading-icon {
+  width: 80rpx;
+  height: 80rpx;
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

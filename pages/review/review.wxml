@@ -1,0 +1,55 @@
+<view class="container">
+  <!-- 模式切换 -->
+  <view class="mode-tabs">
+    <text class="tab {{mode === 'listen' ? 'active' : ''}}" bindtap="switchMode" data-mode="listen">听音选字</text>
+    <text class="tab {{mode === 'speak' ? 'active' : ''}}" bindtap="switchMode" data-mode="speak">看字说音</text>
+  </view>
+
+  <!-- 进度 -->
+  <view class="progress-bar">
+    <text class="progress-text">{{currentIndex + 1}} / {{totalCount}}</text>
+    <view class="progress-track">
+      <view class="progress-fill" style="width: {{progressPercent}}%"></view>
+    </view>
+  </view>
+
+  <!-- 题目区域 - 听音选字模式 -->
+  <view wx:if="{{mode === 'listen' && currentChar}}" class="question-listen">
+    <view class="listen-hint">点击播放按钮，听发音后选择正确答案</view>
+    <button class="play-btn" bindtap="playAudio">
+      <text class="play-icon">🔊</text>
+    </button>
+
+    <!-- 选项 -->
+    <view class="options-grid">
+      <view wx:for="{{options}}" wx:key="id" class="option-item {{selectedId === item.id ? 'selected' : ''}} {{answered ? (item.isCorrect ? 'correct' : 'wrong') : ''}}" bindtap="selectOption" data-id="{{item.id}}">
+        <text class="option-char">{{item.char}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 题目区域 - 看字说音模式 -->
+  <view wx:if="{{mode === 'speak' && currentChar}}" class="question-speak">
+    <view class="char-display">{{currentChar}}</view>
+
+    <button class="record-btn {{recording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
+      <text class="record-icon">{{recording ? '⏸️' : '🎤'}}</text>
+      <text class="record-text">{{recording ? '录音中...' : '按住说出发音'}}</text>
+    </button>
+  </view>
+
+  <!-- 结果提示 -->
+  <view wx:if="{{tipMessage}}" class="tip-message">
+    <text>{{tipMessage}}</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:if="{{!loading && !currentChar && !tipMessage}}" class="empty-state">
+    <text>🎉 今日复习已完成！</text>
+  </view>
+
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+</view>

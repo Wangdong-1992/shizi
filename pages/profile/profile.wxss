@@ -1,0 +1,174 @@
+page {
+  background: linear-gradient(180deg, #E8F4FD 0%, #FDF6EC 100%);
+  min-height: 100vh;
+}
+
+.container {
+  padding: 32rpx;
+}
+
+/* 用户信息卡片 */
+.profile-card {
+  background: white;
+  border-radius: 32rpx;
+  padding: 48rpx;
+  display: flex;
+  align-items: center;
+  gap: 32rpx;
+  margin-bottom: 32rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+  position: relative;
+}
+
+.avatar {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FFD93D 0%, #FF9F43 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80rpx;
+  box-shadow: 0 8rpx 32rpx rgba(255, 159, 67, 0.4);
+}
+
+.settings-btn {
+  position: absolute;
+  top: 24rpx;
+  right: 24rpx;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #f5f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  border: none;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.nickname {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 12rpx;
+}
+
+.join-date {
+  font-size: 26rpx;
+  color: #999;
+}
+
+/* 统计卡片 */
+.stats-card {
+  background: white;
+  border-radius: 32rpx;
+  padding: 32rpx;
+  margin-bottom: 32rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+}
+
+.section-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 24rpx;
+  display: block;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f5f7fa;
+  border-radius: 20rpx;
+  padding: 24rpx 16rpx;
+}
+
+.stat-value {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #4A90D9;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+/* 成就卡片 */
+.achievement-card {
+  background: white;
+  border-radius: 32rpx;
+  padding: 32rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+}
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24rpx;
+}
+
+.achievement-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: #f5f7fa;
+}
+
+.achievement-item.unlocked {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.1) 100%);
+}
+
+.achievement-icon {
+  font-size: 64rpx;
+  margin-bottom: 12rpx;
+}
+
+.achievement-name {
+  font-size: 26rpx;
+  color: #333;
+  text-align: center;
+  margin-bottom: 12rpx;
+}
+
+.achievement-item.locked .achievement-name {
+  color: #999;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8rpx;
+  background: rgba(74, 144, 217, 0.2);
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4A90D9 0%, #7AB3ED 100%);
+}
+
+/* 加载状态 */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx;
+  color: #4A90D9;
+}

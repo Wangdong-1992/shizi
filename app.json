@@ -1,0 +1,45 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/learn/learn",
+    "pages/review/review",
+    "pages/profile/profile",
+    "pages/mastered/mastered"
+  ],
+  "window": {
+    "navigationBarTitleText": "儿童识字",
+    "navigationBarBackgroundColor": "#4A90D9",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "selectedColor": "#4A90D9",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "images/home.png",
+        "selectedIconPath": "images/home-active.png"
+      },
+      {
+        "pagePath": "pages/learn/learn",
+        "text": "学习",
+        "iconPath": "images/learn.png",
+        "selectedIconPath": "images/learn-active.png"
+      },
+      {
+        "pagePath": "pages/review/review",
+        "text": "复习",
+        "iconPath": "images/review.png",
+        "selectedIconPath": "images/review-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "images/profile.png",
+        "selectedIconPath": "images/profile-active.png"
+      }
+    ]
+  }
+}

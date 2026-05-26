@@ -1,0 +1,4 @@
+node_modules/
+.cloudbaserc
+*.log
+.DS_Store

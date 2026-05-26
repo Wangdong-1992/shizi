@@ -1,0 +1,43 @@
+<view class="container">
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <view wx:if="{{!loading && currentChar}}" class="content">
+    <!-- 进度指示器 -->
+    <view class="progress-indicator">
+      <view class="dot {{correctCount >= 1 ? 'active' : ''}}"></view>
+      <view class="dot {{correctCount >= 2 ? 'active' : ''}}"></view>
+      <view class="dot {{correctCount >= 3 ? 'active' : ''}}"></view>
+    </view>
+
+    <!-- 汉字卡片 -->
+    <view class="char-card">
+      <text class="char">{{currentChar}}</text>
+      <text class="pinyin">{{pinyin}}</text>
+    </view>
+
+    <view class="btn-row">
+      <view class="btn speak-btn" bindtap="playAudio">
+        <text>🔊 听发音</text>
+      </view>
+    </view>
+
+    <!-- 跟读按钮 -->
+    <view class="record-area">
+      <view class="record-btn {{isRecording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
+        <text class="record-icon">{{isRecording ? '⏸️' : '🎤'}}</text>
+        <text class="record-text">{{isRecording ? '录音中...' : '按住跟读'}}</text>
+      </view>
+    </view>
+
+    <!-- 提示信息 -->
+    <view wx:if="{{tipMessage}}" class="tip-message">
+      <text>{{tipMessage}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{!loading && !currentChar}}" class="empty">
+    <text>{{tipMessage || '暂无内容'}}</text>
+  </view>
+</view>

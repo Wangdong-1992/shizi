@@ -1,0 +1,36 @@
+<!-- 已掌握汉字列表页 -->
+<view class="page">
+  <!-- 顶部导航 -->
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="goBack">←</view>
+    <view class="nav-title">已掌握汉字（{{total}}个）</view>
+    <view class="nav-placeholder"></view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:elif="{{empty}}" class="empty-state">
+    <text class="empty-text">还没有掌握汉字哦</text>
+    <text class="empty-link" bindtap="goToLearnPage">快去学习吧 →</text>
+  </view>
+
+  <!-- 汉字列表 -->
+  <view wx:else class="char-grid">
+    <view
+      wx:for="{{chars}}"
+      wx:key="id"
+      class="char-card"
+      data-id="{{item.id}}"
+      data-char="{{item.char}}"
+      data-pinyin="{{item.pinyin}}"
+      bindtap="goToLearn"
+    >
+      <text class="char-text">{{item.char}}</text>
+      <text class="char-pinyin">{{item.pinyin}}</text>
+    </view>
+  </view>
+</view>

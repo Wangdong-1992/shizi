@@ -1,0 +1,147 @@
+page {
+  background: linear-gradient(180deg, #E8F4FD 0%, #FDF6EC 100%);
+  min-height: 100vh;
+}
+
+.container {
+  padding: 48rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.loading {
+  padding: 100rpx;
+  text-align: center;
+  color: #4A90D9;
+}
+
+.content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 进度指示器 */
+.progress-indicator {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 48rpx;
+}
+
+.dot {
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  background: #ddd;
+  transition: all 0.3s;
+}
+
+.dot.active {
+  background: #4CAF50;
+}
+
+/* 汉字卡片 */
+.char-card {
+  background: white;
+  border-radius: 40rpx;
+  padding: 80rpx 120rpx;
+  margin-bottom: 60rpx;
+  text-align: center;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+}
+
+.char {
+  font-size: 240rpx;
+  font-weight: bold;
+  color: #333;
+  line-height: 1.2;
+}
+
+.pinyin {
+  font-size: 56rpx;
+  color: #4A90D9;
+  margin-top: 24rpx;
+  font-weight: 500;
+}
+
+/* 按钮行 */
+.btn-row {
+  display: flex;
+  gap: 40rpx;
+  margin-bottom: 60rpx;
+}
+
+.btn {
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  border: none;
+}
+
+.speak-btn {
+  background: linear-gradient(135deg, #4A90D9, #7AB3ED);
+  color: white;
+  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+}
+
+/* 录音区域 */
+.record-area {
+  margin-top: 40rpx;
+}
+
+.record-btn {
+  width: 280rpx;
+  height: 280rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF9F43, #FFB976);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 32rpx rgba(255, 159, 67, 0.4);
+}
+
+.record-btn.recording {
+  background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.record-icon {
+  font-size: 80rpx;
+  margin-bottom: 8rpx;
+}
+
+.record-text {
+  font-size: 28rpx;
+  color: white;
+  font-weight: bold;
+}
+
+/* 提示信息 */
+.tip-message {
+  margin-top: 40rpx;
+  padding: 24rpx 48rpx;
+  background: white;
+  border-radius: 24rpx;
+  font-size: 32rpx;
+  color: #333;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.1);
+}
+
+.empty {
+  padding: 100rpx;
+  text-align: center;
+  color: #666;
+}
