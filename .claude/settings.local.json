@@ -127,7 +127,9 @@
       "Bash(git checkout *)",
       "Bash(git commit *)",
       "Bash(ping *)",
-      "Bash(git remote *)"
+      "Bash(git remote *)",
+      "Bash(bl auth *)",
+      "Bash(bl image *)"
     ]
   }
 }
