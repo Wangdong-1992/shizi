@@ -1,5 +1,6 @@
-// 首页
-const app = getApp();
+// 首页 - V2.0 愉悦体验版
+var app = getApp();
+var Delight = require('../../utils/delight.js');
 
 Page({
   data: {
@@ -10,155 +11,173 @@ Page({
     remainingCount: 2256,
     pendingReviewCount: 0,
     achievements: { total: 7, unlocked_count: 0, achievements: [] },
-    loading: false
+    loading: false,
+
+    // --- 入场动效 ---
+    entranceReady: false,
+    displayStats: { mastered: 0, stars: 0, flowers: 0 },
+    greetingText: '小朋友，你好~'
   },
 
-  onLoad() {
+  onLoad: function() {
     console.log('index onLoad');
+    // 设置动态问候语
+    this.setGreeting();
   },
 
-  onShow() {
+  onShow: function() {
     this.checkLoginStatus();
   },
 
-  onHide() {
+  onHide: function() {
     wx.showTabBar();
   },
 
-  checkLoginStatus() {
-    const openid = app.globalData.openid;
+  // ========== 动态问候语 ==========
+  setGreeting: function() {
+    var hour = new Date().getHours();
+    var greeting;
+    if (hour < 9) {
+      greeting = '早上好，新的一天开始啦~';
+    } else if (hour < 12) {
+      greeting = '上午好，学习时间到~';
+    } else if (hour < 14) {
+      greeting = '中午好，休息一下~';
+    } else if (hour < 18) {
+      greeting = '下午好，继续加油~';
+    } else {
+      greeting = '晚上好，今天学了不少呢~';
+    }
+    this.setData({ greetingText: greeting });
+  },
+
+  // ========== 登录状态检查 ==========
+  checkLoginStatus: function() {
+    var self = this;
+    var openid = app.globalData.openid;
     if (openid) {
       wx.showTabBar();
-      this.setData({ isLoggedIn: true });
-      this.loadIndexData();
+      self.setData({ isLoggedIn: true });
+      self.loadIndexData();
     } else {
       wx.hideTabBar();
-      this.setData({ isLoggedIn: false, loading: false });
+      self.setData({ isLoggedIn: false, loading: false });
     }
   },
 
-  // 切换隐私协议勾选
-  togglePrivacy() {
+  togglePrivacy: function() {
     this.setData({ privacyChecked: !this.data.privacyChecked });
   },
 
-  // 手机号授权回调
-  onGetPhoneNumber(e) {
-    if (!this.data.privacyChecked) {
+  onGetPhoneNumber: function(e) {
+    var self = this;
+    if (!self.data.privacyChecked) {
       wx.showToast({ title: '请先同意用户协议和隐私政策', icon: 'none', duration: 2000 });
       return;
     }
 
-    const { code, errMsg } = e.detail;
-    console.log('getPhoneNumber 回调:', errMsg, 'code:', code);
+    var detail = e.detail;
+    var code = detail.code;
+    var errMsg = detail.errMsg;
 
-    // errMsg 可能是：
-    //   "getPhoneNumber:ok"          → 用户允许授权
-    //   "getPhoneNumber:fail user deny"   → 用户拒绝
-    //   "getPhoneNumber:fail no permission" → 小程序无权限（非企业号/未开通）
-    //   "getPhoneNumber:fail ..."    → 其他失败（模拟器不支持等）
     if (code && errMsg === 'getPhoneNumber:ok') {
-      // 授权成功，用 code 换取手机号
-      this.loginWithPhone(code);
+      self.loginWithPhone(code);
     } else {
-      // 授权失败/用户拒绝/环境不支持 → 静默降级，直接用 wx.login 登录
       console.log('手机号授权不可用，降级为 wx.login 登录:', errMsg);
-      this.silentLogin();
+      self.silentLogin();
     }
   },
 
-  // 静默登录（不走手机号）
-  async silentLogin() {
-    this.setData({ loading: true });
+  silentLogin: async function() {
+    var self = this;
+    self.setData({ loading: true });
     try {
-      const { code } = await wx.login();
-      const wxLoginRes = await wx.cloud.callFunction({
+      var loginRes = await wx.login();
+      var code = loginRes.code;
+      var wxLoginRes = await wx.cloud.callFunction({
         name: 'main',
         data: {
           action: 'wxLogin',
-          data: { code, nickname: '小朋友', avatar: '' }
+          data: { code: code, nickname: '小朋友', avatar: '' }
         }
       });
       if (!wxLoginRes.result || !wxLoginRes.result.openid) {
         throw new Error('wxLogin 失败');
       }
       app.globalData.openid = wxLoginRes.result.openid;
-
       wx.showTabBar();
-      this.setData({ isLoggedIn: true });
-      this.loadIndexData();
+      self.setData({ isLoggedIn: true });
+      self.loadIndexData();
     } catch (err) {
       console.error('静默登录失败:', err);
       wx.showToast({ title: '登录失败，请重试', icon: 'none' });
-      this.setData({ loading: false });
+      self.setData({ loading: false });
     }
   },
 
-  async loginWithPhone(phoneCode) {
-    this.setData({ loading: true });
+  loginWithPhone: async function(phoneCode) {
+    var self = this;
+    self.setData({ loading: true });
 
     try {
-      // 1. 用 phoneCode 换取手机号
-      let phoneNumber = '';
       try {
-        const phoneRes = await wx.cloud.callFunction({
+        var phoneRes = await wx.cloud.callFunction({
           name: 'main',
           data: { action: 'getPhoneNumber', data: { code: phoneCode } }
         });
         if (phoneRes.result && phoneRes.result.success) {
-          phoneNumber = phoneRes.result.phoneNumber;
-          console.log('获取手机号成功:', phoneNumber);
+          console.log('获取手机号成功:', phoneRes.result.phoneNumber);
         }
       } catch (err) {
         console.error('获取手机号失败:', err);
       }
 
-      // 2. 获取微信登录 code → 调 wxLogin 创建/获取用户 → 拿到 openid
-      const { code } = await wx.login();
-      const wxLoginRes = await wx.cloud.callFunction({
+      var loginRes2 = await wx.login();
+      var code = loginRes2.code;
+      var wxLoginRes = await wx.cloud.callFunction({
         name: 'main',
         data: {
           action: 'wxLogin',
-          data: { code, nickname: '小朋友', avatar: '' }
+          data: { code: code, nickname: '小朋友', avatar: '' }
         }
       });
       if (!wxLoginRes.result || !wxLoginRes.result.openid) {
         throw new Error('wxLogin 失败');
       }
-      const openid = wxLoginRes.result.openid;
-      app.globalData.openid = openid;
-
+      app.globalData.openid = wxLoginRes.result.openid;
       wx.showTabBar();
-      this.setData({ isLoggedIn: true });
-      this.loadIndexData();
+      self.setData({ isLoggedIn: true });
+      self.loadIndexData();
     } catch (err) {
       console.error('登录失败:', err);
       wx.showToast({ title: '登录失败，请重试', icon: 'none' });
-      this.setData({ loading: false });
+      self.setData({ loading: false });
     }
   },
 
-  async loadIndexData() {
-    this.setData({ loading: true });
+  // ========== 加载首页数据 ==========
+  loadIndexData: async function() {
+    var self = this;
+    self.setData({ loading: true, entranceReady: false });
 
     try {
-      const openid = await app.getOpenid();
+      var openid = await app.getOpenid();
 
-      const [statsRes, achievementsRes, pendingReviewRes, userRes] = await Promise.all([
-        wx.cloud.callFunction({ name: 'main', data: { action: 'getStats', data: { openid } } }),
-        wx.cloud.callFunction({ name: 'main', data: { action: 'getAchievements', data: { openid } } }),
-        wx.cloud.callFunction({ name: 'main', data: { action: 'getPendingReview', data: { openid, limit: 10 } } }),
-        wx.cloud.callFunction({ name: 'main', data: { action: 'getUser', data: { openid } } })
+      var results = await Promise.all([
+        wx.cloud.callFunction({ name: 'main', data: { action: 'getStats', data: { openid: openid } } }),
+        wx.cloud.callFunction({ name: 'main', data: { action: 'getAchievements', data: { openid: openid } } }),
+        wx.cloud.callFunction({ name: 'main', data: { action: 'getPendingReview', data: { openid: openid, limit: 10 } } }),
+        wx.cloud.callFunction({ name: 'main', data: { action: 'getUser', data: { openid: openid } } })
       ]);
 
-      const stats = statsRes.result?.data || {};
-      const achievements = achievementsRes.result?.data || {};
-      const pendingReview = pendingReviewRes.result?.data || [];
-      const user = userRes.result?.data || {};
+      var stats = results[0].result && results[0].result.data ? results[0].result.data : {};
+      var achievements = results[1].result && results[1].result.data ? results[1].result.data : {};
+      var pendingReview = results[2].result && results[2].result.data ? results[2].result.data : [];
+      var user = results[3].result && results[3].result.data ? results[3].result.data : {};
 
-      const masteredCount = stats.mastered_count || 0;
+      var masteredCount = stats.mastered_count || 0;
 
-      this.setData({
+      self.setData({
         userInfo: {
           nickname: user.nickname || '小朋友',
           avatarUrl: user.avatar_url || ''
@@ -170,29 +189,67 @@ Page({
         },
         remainingCount: 2256 - masteredCount,
         pendingReviewCount: pendingReview.length,
-        achievements,
-        loading: false
+        achievements: achievements,
+        loading: false,
+        // 初始显示值置零
+        displayStats: { mastered: 0, stars: 0, flowers: 0 }
       });
+
+      // 触发入场动画（微小延迟，确保 setData 渲染完成）
+      setTimeout(function() {
+        self.animateEntrance(masteredCount, stats.star_count || 0, stats.flower_count || 0);
+      }, 100);
     } catch (err) {
       console.error('加载首页数据失败:', err);
       wx.showTabBar();
-      this.setData({ loading: false });
+      self.setData({ loading: false });
     }
   },
 
-  startLearn() {
+  // ========== 入场动画序列 ==========
+  animateEntrance: function(masteredCount, starCount, flowerCount) {
+    var self = this;
+
+    // 第1步：触发所有组件的入场 slideUp
+    self.setData({ entranceReady: true });
+
+    // 第2步：延迟后开始数字滚动（等 slideUp 动画进行一半）
+    setTimeout(function() {
+      try {
+        // 批量数字滚动
+        Delight.countUpBatch(self, [
+          { key: 'displayStats.mastered', value: masteredCount },
+          { key: 'displayStats.stars', value: starCount },
+          { key: 'displayStats.flowers', value: flowerCount }
+        ], 800, function() {
+          // 滚动完成后轻震动
+          try { Delight.vibrate('light'); } catch (e) {}
+        });
+      } catch (e) {
+        // 降级：直接显示值
+        self.setData({
+          'displayStats.mastered': masteredCount,
+          'displayStats.stars': starCount,
+          'displayStats.flowers': flowerCount
+        });
+      }
+    }, 250);
+  },
+
+  // ========== 导航 ==========
+  startLearn: function() {
     wx.switchTab({ url: '/pages/learn/learn' });
   },
 
-  startReview() {
+  startReview: function() {
     wx.switchTab({ url: '/pages/review/review' });
   },
 
-  goProfile() {
+  goProfile: function() {
     wx.switchTab({ url: '/pages/profile/profile' });
   },
 
-  goToMastered() {
+  goToMastered: function() {
     wx.navigateTo({ url: '/pages/mastered/mastered' });
   }
 });

@@ -291,25 +291,27 @@ exports.main = async (event, context) => {
           return { success: true, data: { mastered_count: 0, star_count: 0, flower_count: 0, streak_count: 0 } };
         }
         const user = userRes.data[0];
-        // 去重后计算已掌握数量：先按字符串去重，再查询 characters 集合按字符实体去重
         const masteredIds = [...new Set((user.mastered_chars || []).map(id => String(id)))];
-        let masteredCount = masteredIds.length;
+
+        let masteredCount = 0;
         if (masteredIds.length > 0) {
-          try {
-            const charsRes = await db.collection('characters').limit(2256).get();
-            const uniqueIds = new Set();
-            for (const c of charsRes.data) {
-              const idStr = String(c.id || '');
-              const _idStr = String(c._id || '');
-              if (masteredIds.some(mid => mid === idStr || mid === _idStr)) {
-                uniqueIds.add(c.id || c._id);
-              }
-            }
-            masteredCount = uniqueIds.size;
-          } catch (e) {
-            // characters 集合查询失败时回退到字符串去重结果
+          // 与 getMasteredChars 保持一致的计数逻辑：交叉比对 characters 表
+          // 避免 mastered_chars 中的悬空 ID 导致首页和列表页数量不一致
+          const charsRes = await db.collection('characters').limit(2256).get();
+          const allChars = charsRes.data;
+          const matched = allChars.filter(function(c) {
+            var idStr = String(c.id || '');
+            var _idStr = String(c._id || '');
+            return masteredIds.some(function(mid) { return mid === idStr || mid === _idStr; });
+          });
+          // 按 id 去重
+          var seen = new Set();
+          for (var i = 0; i < matched.length; i++) {
+            seen.add(matched[i].id || matched[i]._id);
           }
+          masteredCount = seen.size;
         }
+
         return {
           success: true,
           data: {

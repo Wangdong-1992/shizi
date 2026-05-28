@@ -8,7 +8,16 @@ page {
   padding-bottom: 140rpx;
 }
 
-/* 顶部区域 */
+/* ====== 入口动效容器 ====== */
+.entrance-item {
+  opacity: 0;
+}
+
+.entrance-slide-up {
+  animation: entranceSlideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ====== 顶部区域 ====== */
 .header {
   display: flex;
   justify-content: space-between;
@@ -51,7 +60,7 @@ page {
   color: #333;
 }
 
-/* 统计卡片 */
+/* ====== 统计卡片 ====== */
 .stats-card {
   background: white;
   border-radius: 40rpx;
@@ -60,6 +69,10 @@ page {
   justify-content: space-around;
   margin-bottom: 32rpx;
   box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+}
+
+.stats-card-anim {
+  animation-delay: 0.15s;
 }
 
 .stat-item {
@@ -88,6 +101,14 @@ page {
   font-size: 56rpx;
   font-weight: bold;
   color: #333;
+  min-width: 80rpx;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.stat-value.stat-bump {
+  transform: scale(1.3);
+  color: #4A90D9;
 }
 
 .stat-label {
@@ -96,9 +117,13 @@ page {
   margin-top: 8rpx;
 }
 
-/* 操作区域 */
+/* ====== 操作区域 ====== */
 .actions {
   margin-bottom: 32rpx;
+}
+
+.actions-anim {
+  animation-delay: 0.4s;
 }
 
 .section-title {
@@ -120,6 +145,11 @@ page {
   align-items: center;
   gap: 24rpx;
   box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.08);
+  transition: transform 0.15s;
+}
+
+.action-card:active {
+  transform: scale(0.97);
 }
 
 .action-card.learn { border-left: 8rpx solid #4A90D9; }
@@ -178,12 +208,16 @@ page {
   color: #ccc;
 }
 
-/* 成就区域 */
+/* ====== 成就区域 ====== */
 .achievement-card {
   background: white;
   border-radius: 32rpx;
   padding: 32rpx;
   box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.08);
+}
+
+.achievements-anim {
+  animation-delay: 0.65s;
 }
 
 .achievement-header {
@@ -207,6 +241,10 @@ page {
   font-weight: bold;
 }
 
+.achievement-badge.badge-pulse {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
 .achievement-list {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -220,6 +258,11 @@ page {
   background: #f8f9fa;
   border-radius: 20rpx;
   padding: 24rpx 16rpx;
+  transition: transform 0.3s;
+}
+
+.achievement-item.achievement-unlocked-pulse {
+  animation: achievementPop 2s ease-in-out infinite;
 }
 
 .achievement-icon {
@@ -248,7 +291,7 @@ page {
   text-align: center;
 }
 
-/* 首页头像图片 */
+/* ====== 首页头像图片 ====== */
 .header-avatar-img {
   width: 112rpx;
   height: 112rpx;
@@ -261,7 +304,6 @@ page {
 /* 严选风格登录页         */
 /* ===================== */
 
-/* 全屏背景 */
 .login-bg {
   position: fixed;
   top: 0;
@@ -273,7 +315,6 @@ page {
   overflow: hidden;
 }
 
-/* 漂浮汉字 */
 .float-char {
   position: absolute;
   color: rgba(255, 255, 255, 0.12);
@@ -296,7 +337,6 @@ page {
   50%       { transform: translateY(-30rpx) rotate(5deg); opacity: 0.2; }
 }
 
-/* 主体内容：Logo + Slogan，垂直居中偏上 */
 .login-body {
   position: fixed;
   top: 0;
@@ -307,13 +347,11 @@ page {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-bottom: 300rpx; /* 给底部按钮留出空间 */
+  padding-bottom: 300rpx;
   z-index: 1;
 }
 
-.login-logo-wrap {
-  margin-bottom: 40rpx;
-}
+.login-logo-wrap { margin-bottom: 40rpx; }
 
 .login-logo {
   width: 200rpx;
@@ -342,7 +380,6 @@ page {
   letter-spacing: 4rpx;
 }
 
-/* 底部登录区域：固定在底部 */
 .login-footer {
   position: fixed;
   bottom: 0;
@@ -357,7 +394,6 @@ page {
   box-sizing: border-box;
 }
 
-/* 手机号授权按钮（绿色） */
 .phone-login-btn {
   width: 100%;
   height: 100rpx;
@@ -371,13 +407,9 @@ page {
   justify-content: center;
 }
 
-.phone-login-btn::after {
-  border: none;
-}
+.phone-login-btn::after { border: none; }
 
-.phone-login-btn.btn-disabled {
-  background: #A0D8B5;
-}
+.phone-login-btn.btn-disabled { background: #A0D8B5; }
 
 .phone-btn-inner {
   display: flex;
@@ -386,9 +418,7 @@ page {
   gap: 12rpx;
 }
 
-.phone-icon {
-  font-size: 36rpx;
-}
+.phone-icon { font-size: 36rpx; }
 
 .phone-btn-text {
   font-size: 36rpx;
@@ -405,10 +435,6 @@ page {
   margin-bottom: 28rpx;
 }
 
-/* 确认登录按钮（保留样式类名，可能有其他地方引用） */
-.wx-login-btn {}
-
-/* 隐私协议行 */
 .privacy-row {
   display: flex;
   align-items: center;
@@ -443,17 +469,10 @@ page {
   line-height: 1;
 }
 
-.privacy-text {
-  font-size: 24rpx;
-  color: #999;
-}
+.privacy-text { font-size: 24rpx; color: #999; }
+.privacy-link { font-size: 24rpx; color: #4A90D9; }
 
-.privacy-link {
-  font-size: 24rpx;
-  color: #4A90D9;
-}
-
-/* 加载遮罩 */
+/* ====== 加载遮罩 ====== */
 .loading-mask {
   position: fixed;
   top: 0;
@@ -480,12 +499,6 @@ page {
   margin-bottom: 24rpx;
 }
 
-@keyframes spin {
-  0%   { transform: rotate(0deg) scale(1); }
-  50%  { transform: rotate(180deg) scale(1.1); }
-  100% { transform: rotate(360deg) scale(1); }
-}
-
 .loading-char {
   font-size: 56rpx;
   font-weight: bold;
@@ -495,4 +508,32 @@ page {
 .loading-text {
   font-size: 28rpx;
   color: #4A90D9;
+}
+
+@keyframes spin {
+  0%   { transform: rotate(0deg) scale(1); }
+  50%  { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* ============================================== */
+/*  V2.0 首页入场动效 Keyframes                     */
+/* ============================================== */
+
+/* 弹性上滑入场 */
+@keyframes entranceSlideUp {
+  from { opacity: 0; transform: translateY(60rpx); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 成就徽章脉冲 */
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.4); }
+  50%      { transform: scale(1.05); box-shadow: 0 0 0 12rpx rgba(255, 165, 0, 0); }
+}
+
+/* 已解锁成就呼吸 */
+@keyframes achievementPop {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
 }

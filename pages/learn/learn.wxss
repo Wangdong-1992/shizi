@@ -21,18 +21,19 @@ page {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
 }
 
-/* 进度指示器 */
+/* ==================== 进度指示器 ==================== */
 .progress-indicator {
   display: flex;
-  gap: 16rpx;
+  gap: 20rpx;
   margin-bottom: 48rpx;
 }
 
 .dot {
-  width: 24rpx;
-  height: 24rpx;
+  width: 28rpx;
+  height: 28rpx;
   border-radius: 50%;
   background: #ddd;
   transition: all 0.3s;
@@ -40,9 +41,10 @@ page {
 
 .dot.active {
   background: #4CAF50;
+  animation: starPop 0.4s ease-out;
 }
 
-/* 汉字卡片 */
+/* ==================== 汉字卡片 ==================== */
 .char-card {
   background: white;
   border-radius: 40rpx;
@@ -50,6 +52,7 @@ page {
   margin-bottom: 60rpx;
   text-align: center;
   box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+  position: relative;
 }
 
 .char {
@@ -66,7 +69,33 @@ page {
   font-weight: 500;
 }
 
-/* 按钮行 */
+/* -- 卡片入场动画 -- */
+.char-card.bounce-in {
+  animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes bounceIn {
+  0%   { transform: scale(0.3); opacity: 0; }
+  50%  { transform: scale(1.05); opacity: 1; }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* -- 卡片抖动动画 -- */
+.char-card.shaking {
+  animation: cardShake 0.5s ease-out;
+}
+
+@keyframes cardShake {
+  0%, 100% { transform: translateX(0); }
+  10%      { transform: translateX(-12rpx); }
+  30%      { transform: translateX(12rpx); }
+  50%      { transform: translateX(-8rpx); }
+  70%      { transform: translateX(8rpx); }
+  90%      { transform: translateX(-4rpx); }
+}
+
+/* ==================== 按钮 ==================== */
 .btn-row {
   display: flex;
   gap: 40rpx;
@@ -90,9 +119,13 @@ page {
   box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
 }
 
-/* 录音区域 */
+/* ==================== 录音区域 + 水波纹 ==================== */
 .record-area {
   margin-top: 40rpx;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .record-btn {
@@ -105,16 +138,18 @@ page {
   align-items: center;
   justify-content: center;
   box-shadow: 0 8rpx 32rpx rgba(255, 159, 67, 0.4);
+  position: relative;
+  z-index: 2;
 }
 
 .record-btn.recording {
   background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
-  animation: pulse 1s infinite;
+  animation: recordPulse 1s infinite;
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+@keyframes recordPulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.06); }
   100% { transform: scale(1); }
 }
 
@@ -129,7 +164,117 @@ page {
   font-weight: bold;
 }
 
-/* 提示信息 */
+/* 水波纹 */
+.ripple-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255, 107, 107, 0.4);
+  z-index: 1;
+}
+
+.ripple-ring.ring-1 {
+  width: 340rpx;
+  height: 340rpx;
+  animation: ripple 1.5s ease-out infinite;
+}
+
+.ripple-ring.ring-2 {
+  width: 400rpx;
+  height: 400rpx;
+  animation: ripple 1.5s ease-out 0.75s infinite;
+}
+
+@keyframes ripple {
+  0%   { transform: scale(0.7); opacity: 0.6; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* ==================== 反馈卡片 ==================== */
+.feedback-card {
+  margin-top: 48rpx;
+  padding: 28rpx 56rpx;
+  border-radius: 48rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  animation: feedbackSlide 0.35s ease-out;
+}
+
+@keyframes feedbackSlide {
+  0%   { transform: translateY(24rpx); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.feedback-card.feedback-success {
+  background: linear-gradient(135deg, #D4EDDA, #C3E6CB);
+  box-shadow: 0 4rpx 16rpx rgba(76, 175, 80, 0.25);
+}
+
+.feedback-card.feedback-error {
+  background: linear-gradient(135deg, #FFF3CD, #FFE69C);
+  box-shadow: 0 4rpx 16rpx rgba(255, 159, 67, 0.25);
+}
+
+.feedback-card.feedback-info {
+  background: linear-gradient(135deg, #D6EAF8, #AED6F1);
+  box-shadow: 0 4rpx 16rpx rgba(74, 144, 217, 0.2);
+}
+
+.feedback-icon {
+  font-size: 40rpx;
+}
+
+.feedback-text {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+/* ==================== 星星粒子 ==================== */
+.star-layer {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.star-particle {
+  position: absolute;
+  background: #FFD700;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  animation: starBurst 1.2s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes starBurst {
+  0%   { transform: scale(0) rotate(0deg); opacity: 1; }
+  50%  { transform: scale(1.5) rotate(180deg); opacity: 0.8; }
+  100% { transform: scale(0) rotate(360deg); opacity: 0; }
+}
+
+/* ==================== 烟花粒子 ==================== */
+.confetti-layer {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.confetti-particle {
+  position: absolute;
+  border-radius: 4rpx;
+  top: -10%;
+  animation: confettiFall linear forwards;
+}
+
+@keyframes confettiFall {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) translateX(var(--wobble)) rotate(720deg); opacity: 0; }
+}
+
+/* ==================== 旧提示（保留兼容） ==================== */
 .tip-message {
   margin-top: 40rpx;
   padding: 24rpx 48rpx;
@@ -144,4 +289,11 @@ page {
   padding: 100rpx;
   text-align: center;
   color: #666;
+}
+
+/* ==================== 进度点激活动画 ==================== */
+@keyframes starPop {
+  0%   { transform: scale(0.3); opacity: 0; }
+  60%  { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
