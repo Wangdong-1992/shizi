@@ -32,6 +32,11 @@ page {
   box-shadow: 0 8rpx 32rpx rgba(255, 159, 67, 0.4);
 }
 
+.avatar-img {
+  background: none;
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.15);
+}
+
 .settings-btn {
   position: absolute;
   top: 24rpx;

@@ -6,13 +6,13 @@
   <view wx:if="{{!loading && currentChar}}" class="content">
     <!-- 进度指示器 -->
     <view class="progress-indicator">
-      <view class="dot {{correctCount >= 1 ? 'active' : ''}}"></view>
-      <view class="dot {{correctCount >= 2 ? 'active' : ''}}"></view>
-      <view class="dot {{correctCount >= 3 ? 'active' : ''}}"></view>
+      <view class="dot {{correctCount >= 1 ? 'active' : ''}} star-dot-1"></view>
+      <view class="dot {{correctCount >= 2 ? 'active' : ''}} star-dot-2"></view>
+      <view class="dot {{correctCount >= 3 ? 'active' : ''}} star-dot-3"></view>
     </view>
 
-    <!-- 汉字卡片 -->
-    <view class="char-card">
+    <!-- 汉字卡片（带入场动画 + 抖动） -->
+    <view class="char-card {{cardEntrance ? 'bounce-in' : ''}} {{shaking ? 'shaking' : ''}}">
       <text class="char">{{currentChar}}</text>
       <text class="pinyin">{{pinyin}}</text>
     </view>
@@ -23,17 +23,30 @@
       </view>
     </view>
 
-    <!-- 跟读按钮 -->
+    <!-- 跟读按钮 + 水波纹 -->
     <view class="record-area">
+      <view wx:if="{{isRecording}}" class="ripple-ring ring-1"></view>
+      <view wx:if="{{isRecording}}" class="ripple-ring ring-2"></view>
       <view class="record-btn {{isRecording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
         <text class="record-icon">{{isRecording ? '⏸️' : '🎤'}}</text>
         <text class="record-text">{{isRecording ? '录音中...' : '按住跟读'}}</text>
       </view>
     </view>
 
-    <!-- 提示信息 -->
-    <view wx:if="{{tipMessage}}" class="tip-message">
-      <text>{{tipMessage}}</text>
+    <!-- 反馈卡片（替代原 tip-message） -->
+    <view wx:if="{{feedbackShow}}" class="feedback-card feedback-{{feedbackType}}">
+      <text class="feedback-icon">{{feedbackIcon}}</text>
+      <text class="feedback-text">{{tipMessage}}</text>
+    </view>
+
+    <!-- 星星粒子层 -->
+    <view wx:if="{{showStars}}" class="star-layer">
+      <view wx:for="{{stars}}" wx:key="id" class="star-particle" style="left:{{item.x}}%;top:{{item.y}}%;width:{{item.size}}rpx;height:{{item.size}}rpx;animation-delay:{{item.delay}}s;transform:rotate({{item.rotate}}deg);"></view>
+    </view>
+
+    <!-- 烟花粒子层 -->
+    <view wx:if="{{showConfetti}}" class="confetti-layer">
+      <view wx:for="{{confetti}}" wx:key="id" class="confetti-particle" style="left:{{item.x}}%;background:{{item.color}};width:{{item.size}}rpx;height:{{item.size}}rpx;animation-delay:{{item.delay}}s;animation-duration:{{item.duration}}s;--wobble:{{item.wobble}}rpx;"></view>
     </view>
   </view>
 

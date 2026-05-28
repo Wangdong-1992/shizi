@@ -3,7 +3,12 @@ const app = getApp();
 
 Page({
   data: {
-    userInfo: {},
+    userInfo: {
+      nickname: '小明',
+      avatarUrl: '',
+      isCloudAvatar: false,
+      avatarEmoji: '👶'
+    },
     stats: {
       mastered_count: 0,
       star_count: 0,
@@ -58,10 +63,34 @@ Page({
       });
       const userInfo = userRes.result?.data || {};
 
+      // 处理头像：云文件 ID 需转临时链接，否则用 emoji
+      var avatarUrl = '';
+      var isCloudAvatar = false;
+      var avatarEmoji = '👶';
+
+      if (userInfo.avatar_url) {
+        if (userInfo.avatar_url.indexOf('cloud://') === 0) {
+          // 云文件 ID，转临时链接
+          var tempRes = await wx.cloud.getTempFileURL({
+            fileList: [userInfo.avatar_url]
+          });
+          if (tempRes.fileList && tempRes.fileList[0] && tempRes.fileList[0].tempFileURL) {
+            avatarUrl = tempRes.fileList[0].tempFileURL;
+            isCloudAvatar = true;
+          }
+        } else if (userInfo.avatar_url.indexOf('http') === 0 || userInfo.avatar_url.indexOf('wxfile://') === 0) {
+          // 已经是可访问的 URL
+          avatarUrl = userInfo.avatar_url;
+          isCloudAvatar = true;
+        }
+      }
+
       this.setData({
         userInfo: {
           nickname: userInfo.nickname || '小明',
-          avatar: userInfo.avatar_url || '👶'
+          avatarUrl: avatarUrl,
+          isCloudAvatar: isCloudAvatar,
+          avatarEmoji: avatarEmoji
         },
         stats: {
           mastered_count: stats.mastered_count || 0,
