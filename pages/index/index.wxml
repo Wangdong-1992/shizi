@@ -4,7 +4,12 @@
     <!-- 顶部区域 -->
     <view class="header">
       <view class="user-info">
-        <view class="avatar">{{userInfo.avatar || '👶'}}</view>
+        <block wx:if="{{userInfo.avatarUrl}}">
+          <image class="header-avatar-img" src="{{userInfo.avatarUrl}}" mode="aspectFill" />
+        </block>
+        <block wx:else>
+          <view class="avatar">👶</view>
+        </block>
         <view class="user-text">
           <text class="greeting">小朋友，你好~</text>
           <text class="nickname">{{userInfo.nickname || '小明'}}</text>
@@ -73,20 +78,63 @@
     </view>
   </block>
 
-  <!-- 未登录状态 -->
+  <!-- 未登录状态：严选风格登录页 -->
   <block wx:else>
-    <view class="login-container">
-      <view class="login-card">
-        <view class="login-avatar">👶</view>
-        <text class="login-title">儿童识字</text>
-        <text class="login-desc">帮助3-6岁儿童轻松学习2256个常用汉字</text>
-        <button class="login-btn" bindtap="doLogin">一键登录</button>
+    <!-- 全屏背景层 -->
+    <view class="login-bg">
+      <!-- 漂浮汉字装饰 -->
+      <view class="float-char fc1">一</view>
+      <view class="float-char fc2">字</view>
+      <view class="float-char fc3">学</view>
+      <view class="float-char fc4">读</view>
+      <view class="float-char fc5">写</view>
+      <view class="float-char fc6">认</view>
+      <view class="float-char fc7">拼</view>
+      <view class="float-char fc8">音</view>
+    </view>
+
+    <!-- 主体内容区：居中 Logo + 文案 -->
+    <view class="login-body">
+      <view class="login-logo-wrap">
+        <view class="login-logo">📖</view>
+      </view>
+      <text class="login-app-name">儿童识字</text>
+      <text class="login-slogan">轻松学汉字，快乐每一天</text>
+    </view>
+
+    <!-- 底部登录区域（固定在底部） -->
+    <view class="login-footer">
+      <!-- 手机号授权按钮 -->
+      <button
+        class="phone-login-btn {{privacyChecked ? '' : 'btn-disabled'}}"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onGetPhoneNumber"
+      >
+        <view class="phone-btn-inner">
+          <text class="phone-icon">📱</text>
+          <text class="phone-btn-text">微信手机号一键登录</text>
+        </view>
+      </button>
+      <text class="phone-hint">点击按钮授权后自动创建账号</text>
+
+      <!-- 隐私协议 -->
+      <view class="privacy-row" bindtap="togglePrivacy">
+        <view class="privacy-checkbox {{privacyChecked ? 'checked' : ''}}">
+          <text wx:if="{{privacyChecked}}" class="check-icon">✓</text>
+        </view>
+        <text class="privacy-text">我已阅读并同意</text>
+        <text class="privacy-link">《用户协议》</text>
+        <text class="privacy-text">和</text>
+        <text class="privacy-link">《隐私政策》</text>
       </view>
     </view>
   </block>
 
   <!-- 加载状态 -->
-  <view wx:if="{{loading}}" class="loading">
-    <text>加载中...</text>
+  <view wx:if="{{loading}}" class="loading-mask">
+    <view class="loading-spinner">
+      <text class="loading-char">字</text>
+    </view>
+    <text class="loading-text">加载中...</text>
   </view>
 </view>

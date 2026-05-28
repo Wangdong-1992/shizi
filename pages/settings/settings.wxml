@@ -1,11 +1,70 @@
 <view class="container">
   <view class="settings-list">
+    <!-- 修改头像 -->
+    <view class="settings-item" bindtap="showAvatarSheet">
+      <text class="settings-label">修改头像</text>
+      <view class="settings-right">
+        <image wx:if="{{currentAvatar}}" class="settings-avatar-preview" src="{{currentAvatar}}" mode="aspectFill"/>
+        <text wx:else class="settings-avatar-emoji">👶</text>
+        <text class="settings-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 修改昵称 -->
+    <view class="settings-item" bindtap="showNicknameSheet">
+      <text class="settings-label">修改昵称</text>
+      <view class="settings-right">
+        <text class="settings-value">{{currentNickname || '小朋友'}}</text>
+        <text class="settings-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 关于我们 -->
     <view class="settings-item" bindtap="showAbout">
       <text class="settings-label">关于我们</text>
       <text class="settings-arrow">›</text>
     </view>
+
+    <!-- 退出登录 -->
     <view class="settings-item logout" bindtap="logout">
       <text class="logout-text">退出登录</text>
+    </view>
+  </view>
+
+  <!-- ========= 修改昵称弹窗 ========= -->
+  <view class="popup-mask" wx:if="{{nicknamePopup.show}}" bindtap="closeNicknamePopup"></view>
+  <view class="popup-sheet {{nicknamePopup.show ? 'popup-show' : ''}}">
+    <text class="popup-title">{{nicknamePopup.title}}</text>
+    <input
+      class="popup-input"
+      type="{{nicknamePopup.inputType}}"
+      placeholder="{{nicknamePopup.placeholder}}"
+      maxlength="{{nicknamePopup.maxLength}}"
+      value="{{nicknamePopup.value}}"
+      bindinput="onNicknameChange"
+      bindblur="onNicknameChange"
+      focus="{{nicknamePopup.show}}"
+    />
+    <view class="popup-actions">
+      <button class="popup-btn cancel" bindtap="closeNicknamePopup">取消</button>
+      <button class="popup-btn confirm" bindtap="confirmNickname">确定</button>
+    </view>
+  </view>
+
+  <!-- ========= 微信头像选择弹窗 ========= -->
+  <view class="popup-mask" wx:if="{{avatarPopup.show}}" bindtap="closeAvatarPopup"></view>
+  <view class="popup-sheet {{avatarPopup.show ? 'popup-show' : ''}}">
+    <text class="popup-title">使用微信头像</text>
+    <button class="wx-avatar-pick-btn" open-type="chooseAvatar" bindchooseavatar="onWxAvatarChoose">
+      <image wx:if="{{avatarPopup.tempUrl}}" class="wx-avatar-preview" src="{{avatarPopup.tempUrl}}" mode="aspectFill"/>
+      <block wx:else>
+        <text class="wx-avatar-icon">📷</text>
+        <text class="wx-avatar-hint">点击选择微信头像</text>
+      </block>
+    </button>
+    <view class="popup-actions">
+      <button class="popup-btn cancel" bindtap="closeAvatarPopup">取消</button>
+      <button class="popup-btn confirm" bindtap="confirmWxAvatar">确定</button>
     </view>
   </view>
 </view>
