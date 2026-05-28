@@ -3,6 +3,7 @@ App({
   globalData: {
     userInfo: null,
     openid: null,
+    token: null,
     fromMasteredChar: null
   },
 

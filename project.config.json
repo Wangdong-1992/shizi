@@ -26,7 +26,20 @@
   "compileType": "miniprogram",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "value": "node_modules",
+        "type": "folder"
+      },
+      {
+        "value": "out",
+        "type": "folder"
+      },
+      {
+        "value": "shizi-docs",
+        "type": "folder"
+      }
+    ],
     "include": []
   },
   "appid": "wxa2bbfca6b9ef6ebd",

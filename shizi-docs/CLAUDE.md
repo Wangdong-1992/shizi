@@ -22,10 +22,14 @@ E:/claude/PMRD/shizi/
 │   ├── index/                # 首页
 │   ├── learn/                # 学习页
 │   ├── review/               # 复习页
-│   └── profile/              # 个人中心
+│   ├── profile/              # 个人中心
+│   ├── mastered/             # 已掌握汉字列表
+│   └── settings/             # 设置页（V1.3.0）
 ├── cloudfunctions/           # 云函数
 │   ├── login/                # 获取openid
-│   └── main/                 # 主业务逻辑
+│   ├── main/                 # 主业务逻辑（11个action）
+│   ├── fixData/              # 数据修复
+│   └── import_chardata/      # 汉字数据导入
 ├── images/                   # TabBar图标
 ├── app.js                    # 应用入口
 ├── app.json                  # 全局配置
@@ -53,11 +57,14 @@ E:/claude/PMRD/shizi/
 {
   "openid": "xxx",
   "nickname": "小明",
+  "avatar_url": "",
   "star_count": 0,
   "flower_count": 0,
   "streak_count": 0,
   "mastered_chars": [],
-  "last_learn_date": ""
+  "last_learn_date": "",
+  "token": "xxx",
+  "token_expire": "Date"
 }
 ```
 
@@ -86,6 +93,7 @@ E:/claude/PMRD/shizi/
 
 | action | 说明 |
 |--------|------|
+| wxLogin | 微信登录（code换openid + 生成token） |
 | getUser | 获取用户信息 |
 | getStats | 获取用户统计 |
 | getNextChar | 获取下一个待学汉字 |
@@ -94,10 +102,13 @@ E:/claude/PMRD/shizi/
 | getAchievements | 获取成就列表 |
 | getOptions | 获取听音选字选项 |
 | recordReview | 记录复习结果 |
+| recognizeVoice | 百度语音识别 |
+| getAudio | 百度TTS发音 |
+| getMasteredChars | 获取已掌握汉字列表 |
 
 ## 已完成功能
 
-- [x] 云函数部署
+- [x] 云函数部署（login, main）
 - [x] 云数据库集合创建（users, characters, achievement_log, reward_logs, review_logs, learning_progress）
 - [x] 汉字数据导入（2256字）
 - [x] TabBar图标
@@ -105,6 +116,20 @@ E:/claude/PMRD/shizi/
 - [x] 跳过按钮（已移除）
 - [x] AI配图（已移除）
 - [x] 成就奖励计算修复
+- [x] 已掌握汉字列表页（mastered）
+- [x] 设置页（settings）- 含关于我们、退出登录
+- [x] 登录页UI改版（微信绿色按钮+隐私协议）
+- [x] wxLogin云函数（token生成，7天有效期）
+- [x] 严选风格登录页改造（V1.5.0）：全屏渐变背景+漂浮汉字+底部白色卡片+绑定 getUserInfo
+- [x] 登录授权修复（V1.5.1）：废弃 getUserInfo → chooseAvatar + nickname input + 头像云存储上传
+- [x] 手机号授权登录 + 设置页头像昵称修改（V1.6.0）
+
+## 待完成功能
+
+- [x] 语音发音（百度TTS，已接入getAudio）
+- [x] 跟读识别功能（百度ASR，已接入recognizeVoice）
+- [x] 复习页完整功能（听音选字、看字说音）
+- [x] 个人中心数据展示
 
 ## 待完成功能
 

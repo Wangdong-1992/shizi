@@ -5,6 +5,10 @@ const https = require('https');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
+// 微信小程序配置
+const WX_APPID = 'wxa2bbfca6b9ef6ebd';
+const WX_APPSECRET = '1107be03905f4721c554bcfc539708d7';
+
 // 百度语音识别配置
 const BAIDU_API_KEY = '9Cwtp66NdN02jE5sALz7Q5rD';
 const BAIDU_SECRET_KEY = 'yHh8xH9BICC0ZH4oOEGAdZEeXemviwN6';
@@ -23,6 +27,73 @@ const ACHIEVEMENTS = [
   { id: 'ACH006', name: '汉字小状元', requirement: 2000, icon: '👑', reward: { type: 'flower', amount: 20 } },
   { id: 'ACH007', name: '汉字小天才', requirement: 3500, icon: '🌈', reward: { type: 'flower', amount: 50 } }
 ];
+
+// 微信 code 换 openid
+function code2openid(code) {
+  return new Promise((resolve, reject) => {
+    const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${WX_APPID}&secret=${WX_APPSECRET}&js_code=${code}&grant_type=authorization_code`;
+
+    const req = https.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          if (result.openid) {
+            resolve(result.openid);
+          } else {
+            console.error('code2openid failed:', result);
+            resolve(null);
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      console.error('code2openid network error:', err.message);
+      resolve(null);
+    });
+
+    req.setTimeout(5000, () => {
+      console.error('code2openid timeout');
+      req.destroy();
+      resolve(null);
+    });
+  });
+}
+
+// 微信 Access Token 缓存（用于 getPhoneNumber 等需要 access_token 的接口）
+let wxAccessToken = null;
+let wxAccessTokenExpire = 0;
+
+function getWxAccessToken() {
+  return new Promise((resolve, reject) => {
+    if (wxAccessToken && Date.now() < wxAccessTokenExpire) {
+      return resolve(wxAccessToken);
+    }
+    const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${WX_APPID}&secret=${WX_APPSECRET}`;
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          if (result.access_token) {
+            wxAccessToken = result.access_token;
+            wxAccessTokenExpire = Date.now() + (result.expires_in - 300) * 1000;
+            resolve(wxAccessToken);
+          } else {
+            reject(new Error('获取微信 access_token 失败: ' + JSON.stringify(result)));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', reject);
+  });
+}
 
 // 获取百度 Access Token
 function getBaiduAccessToken() {
@@ -153,6 +224,60 @@ exports.main = async (event, context) => {
     const _ = db.command;
 
     switch (action) {
+      case 'wxLogin': {
+        const { code, nickname, avatar } = data;
+        if (!code) {
+          return { success: false, error: 'code不能为空' };
+        }
+
+        // 1. 用 code 换 openid
+        const openid = await code2openid(code);
+        if (!openid) {
+          return { success: false, error: 'code无效，获取openid失败' };
+        }
+
+        // 2. 生成 token
+        const token = crypto.randomBytes(32).toString('base64');
+        const tokenExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7天后过期
+
+        // 3. 查用户是否存在
+        const userRes = await db.collection('users').where({ openid }).get();
+
+        if (userRes.data && userRes.data.length > 0) {
+          // 存在 → 更新昵称头像和 token
+          await db.collection('users').where({ openid }).update({
+            data: {
+              nickname: nickname || userRes.data[0].nickname,
+              avatar_url: avatar || userRes.data[0].avatar_url,
+              token: token,
+              token_expire: tokenExpire,
+              updated_at: new Date()
+            }
+          });
+        } else {
+          // 不存在 → 新建用户
+          await db.collection('users').add({
+            data: {
+              openid,
+              nickname: nickname || '小朋友',
+              avatar_url: avatar || '',
+              token: token,
+              token_expire: tokenExpire,
+              star_count: 0,
+              flower_count: 0,
+              streak_count: 0,
+              mastered_chars: [],
+              last_learn_date: '',
+              created_at: new Date(),
+              updated_at: new Date()
+            }
+          });
+        }
+
+        console.log('wxLogin success, openid:', openid, 'token:', token);
+        return { success: true, token, openid };
+      }
+
       case 'getUser': {
         const { openid } = data;
         const userRes = await db.collection('users').where({ openid }).get();
@@ -166,12 +291,29 @@ exports.main = async (event, context) => {
           return { success: true, data: { mastered_count: 0, star_count: 0, flower_count: 0, streak_count: 0 } };
         }
         const user = userRes.data[0];
-        // 去重后计算已掌握数量（避免数据库中同一字被重复存储导致数量不一致）
-        const masteredChars = [...new Set((user.mastered_chars || []).map(id => String(id)))];
+        // 去重后计算已掌握数量：先按字符串去重，再查询 characters 集合按字符实体去重
+        const masteredIds = [...new Set((user.mastered_chars || []).map(id => String(id)))];
+        let masteredCount = masteredIds.length;
+        if (masteredIds.length > 0) {
+          try {
+            const charsRes = await db.collection('characters').limit(2256).get();
+            const uniqueIds = new Set();
+            for (const c of charsRes.data) {
+              const idStr = String(c.id || '');
+              const _idStr = String(c._id || '');
+              if (masteredIds.some(mid => mid === idStr || mid === _idStr)) {
+                uniqueIds.add(c.id || c._id);
+              }
+            }
+            masteredCount = uniqueIds.size;
+          } catch (e) {
+            // characters 集合查询失败时回退到字符串去重结果
+          }
+        }
         return {
           success: true,
           data: {
-            mastered_count: masteredChars.length,
+            mastered_count: masteredCount,
             star_count: user.star_count || 0,
             flower_count: user.flower_count || 0,
             streak_count: user.streak_count || 0
@@ -202,7 +344,7 @@ exports.main = async (event, context) => {
         }
 
         const user = userRes.data[0];
-        const masteredIds = user.mastered_chars || [];
+        const masteredIds = (user.mastered_chars || []).map(id => String(id));
 
         // 获取所有汉字，在内存中过滤（避免 nin 查询的类型问题）
         const charsRes = await db.collection('characters').limit(2256).get();
@@ -213,10 +355,11 @@ exports.main = async (event, context) => {
           return { success: true, data: allChars[0] || null };
         }
 
-        // 过滤出未掌握的汉字
+        // 过滤出未掌握的汉字（id 和 _id 都要匹配，字符串比较）
         const unmastered = allChars.filter(c => {
-          const charId = c.id || c._id;
-          return !masteredIds.includes(charId);
+          const idStr = String(c.id || '');
+          const _idStr = String(c._id || '');
+          return !masteredIds.some(mid => mid === idStr || mid === _idStr);
         });
 
         // 随机返回一个
@@ -298,7 +441,7 @@ exports.main = async (event, context) => {
         }
 
         const user = userRes.data[0];
-        const masteredIds = user.mastered_chars || [];
+        const masteredIds = (user.mastered_chars || []).map(id => String(id));
         if (masteredIds.length === 0) {
           return { success: true, data: [] };
         }
@@ -329,10 +472,11 @@ exports.main = async (event, context) => {
         const charsRes = await db.collection('characters').limit(2256).get();
         const allChars = charsRes.data;
 
-        // 过滤出已掌握的汉字
+        // 过滤出已掌握的汉字（id 和 _id 都要匹配，字符串比较）
         const masteredChars = allChars.filter(c => {
-          const charId = c.id || c._id;
-          return masteredIds.includes(charId);
+          const idStr = String(c.id || '');
+          const _idStr = String(c._id || '');
+          return masteredIds.some(mid => mid === idStr || mid === _idStr);
         });
 
         // 如果有优先级信息，按优先级排序
@@ -566,6 +710,66 @@ exports.main = async (event, context) => {
             success: false,
             error: err.message
           };
+        }
+      }
+
+      case 'updateUserInfo': {
+        // 更新用户昵称和头像（登录授权后调用）
+        const { openid, nickname, avatar_url, avatarUrl } = data;
+        if (!openid) {
+          return { success: false, error: 'openid不能为空' };
+        }
+
+        const finalAvatar = avatar_url || avatarUrl || '';
+        const updateData = { updated_at: new Date() };
+        if (nickname) updateData.nickname = nickname;
+        if (finalAvatar) updateData.avatar_url = finalAvatar;
+
+        await db.collection('users').where({ openid }).update({ data: updateData });
+        console.log('updateUserInfo success, openid:', openid, 'nickname:', nickname);
+        return { success: true };
+      }
+
+      case 'getPhoneNumber': {
+        // 使用 code 换取手机号（基础库 2.21.2+ 方式）
+        const { code } = data;
+        if (!code) {
+          return { success: false, error: 'code不能为空' };
+        }
+        try {
+          const accessToken = await getWxAccessToken();
+          const url = `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${accessToken}`;
+          const result = await new Promise((resolve, reject) => {
+            const postData = JSON.stringify({ code });
+            const req = https.request(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+              }
+            }, (res) => {
+              let body = '';
+              res.on('data', chunk => body += chunk);
+              res.on('end', () => {
+                try { resolve(JSON.parse(body)); }
+                catch (e) { reject(e); }
+              });
+            });
+            req.on('error', reject);
+            req.write(postData);
+            req.end();
+          });
+          if (result.errcode === 0 && result.phone_info) {
+            const phoneNumber = result.phone_info.phoneNumber;
+            console.log('getPhoneNumber success:', phoneNumber);
+            return { success: true, phoneNumber };
+          } else {
+            console.error('getPhoneNumber failed:', result);
+            return { success: false, error: result.errmsg || '获取手机号失败' };
+          }
+        } catch (err) {
+          console.error('getPhoneNumber error:', err.message);
+          return { success: false, error: err.message };
         }
       }
 

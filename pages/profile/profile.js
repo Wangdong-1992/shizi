@@ -23,6 +23,13 @@ Page({
     this.loadProfile();
   },
 
+  onShow() {
+    // 从设置页返回时刷新（头像/昵称可能已修改）
+    if (this.data.loading === false) {
+      this.loadProfile();
+    }
+  },
+
   async loadProfile() {
     this.setData({ loading: true });
 
