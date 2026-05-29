@@ -16,7 +16,7 @@
 ```
 E:/claude/PMRD/shizi/
 ├── docs/                              # 产品文档
-│   ├── 儿童识字应用_PRD_V1.1.0.md      # 产品需求文档
+│   ├── 儿童识字应用_PRD_V2.0.0.md      # 产品需求文档
 │   ├── 一级字表_拼音.xlsx              # 2256字原始数据
 │   └── CLAUDE.md                      # 本文件（项目约定）
 ├── pages/                             # 页面目录
@@ -26,8 +26,12 @@ E:/claude/PMRD/shizi/
 │   ├── profile/                       # 个人中心
 │   ├── mastered/                      # 已掌握汉字列表
 │   └── settings/                      # 设置页
+├── scripts/
+│   └── convert-stroke-data.js          # 笔顺数据生成脚本
 ├── utils/
-│   └── delight.js                     # V2.0 愉悦体验引擎
+│   ├── delight.js                      # V2.0 愉悦体验引擎
+│   ├── spaced-repetition.js            # V2.2 间隔重复算法模块
+│   └── stroke-data.js                  # 笔顺路径数据（2256字）
 ├── cloudfunctions/                    # 云函数
 │   ├── login/                         # 获取openid
 │   ├── main/                          # 主业务逻辑（14个action）
@@ -98,18 +102,20 @@ E:/claude/PMRD/shizi/
 |--------|------|------|
 | wxLogin | 微信登录（code换openid + 生成token） | { code, nickname, avatarUrl } |
 | getUser | 获取用户信息 | { openid } |
-| getStats | 获取用户统计（与getMasteredChars使用相同交叉比对逻辑） | { openid } |
+| getStats | 获取用户统计 | { openid } |
 | getNextChar | 获取下一个待学汉字 | { openid } |
+| getLearnChar | 获取字详情+笔顺+学习进度 | { openid, charId } |
 | recordLearn | 记录学习完成（含奖励发放） | { openid, charId } |
-| getPendingReview | 获取待复习列表 | { openid, limit } |
+| getPendingReview | 获取待复习列表（优先级排序） | { openid, limit } |
 | getAchievements | 获取成就列表 | { openid } |
 | getOptions | 获取听音选字选项 | { charId } |
-| recordReview | 记录复习结果 | { openid, charId, reviewMode, isCorrect } |
+| recordReview | 记录复习结果（三写：日志+进度+状态） | { openid, charId, reviewMode, isCorrect, exerciseType } |
+| migrateProgress | 旧数据按需迁移 | { openid } |
 | recognizeVoice | 百度语音识别 | { fileID, targetPinyin } |
 | getAudio | 百度TTS发音 | { char, pinyin } |
 | updateUserInfo | 更新用户信息（头像/昵称） | { openid, nickname, avatarUrl } |
 | getPhoneNumber | 微信手机号解密 | { code } |
-| getMasteredChars | 获取已掌握汉字列表（交叉比对characters表） | { openid } |
+| getMasteredChars | 获取已掌握汉字列表 | { openid } |
 
 ## V2.0 愉悦体验引擎 (utils/delight.js)
 
@@ -150,6 +156,13 @@ E:/claude/PMRD/shizi/
 - [x] 登录授权修复（V1.5.1）：废弃getUserInfo → chooseAvatar + nickname input + 头像云存储上传
 - [x] 手机号授权登录 + 设置页头像昵称修改（V1.6.0）：getPhoneNumber + 默认头像昵称 + 设置页可修改
 - [x] 愉悦体验全面升级（V2.0.0）：utils/delight.js + 三页面动画改造 + 14组关键帧动画
+- [x] ASR降级选择题 + Math.random()假阳性消除（V2.1）：learn.js/review.js/云函数三处随机fallback修复
+- [x] 间隔重复引擎（V2.2）：utils/spaced-repetition.js + Leitner Box (1-5级) + 五级掌握状态机 + 优先级调度
+- [x] 四步递进学习页重构（V2.2）：释义→再认→描红→跟读，单页状态机
+- [x] 复习页适配（V2.2）：Box升降反馈 + 状态变迁提示 + exerciseType参数
+- [x] 笔顺数据生成（V2.2）：scripts/convert-stroke-data.js + hanzi-writer-data → 2256字完整笔顺数据(GB 13000.1)
+- [x] 旧数据按需迁移（V2.2）：migrateProgress云函数，首页首次访问触发
+- [x] 云函数 recordReview 三写闭环：review_logs + learning_progress + 状态信息返回
 
 ## 已修复Bug
 

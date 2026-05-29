@@ -117,6 +117,65 @@ page {
   margin-top: 8rpx;
 }
 
+/* ====== V2.2 今日待复习卡片 ====== */
+.review-card {
+  margin-bottom: 24rpx;
+}
+
+.review-card-anim {
+  animation-delay: 0.28s;
+}
+
+.review-card-inner {
+  background: linear-gradient(135deg, #FF9F43 0%, #FFB976 100%);
+  border-radius: 32rpx;
+  padding: 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  box-shadow: 0 8rpx 32rpx rgba(255, 159, 67, 0.35);
+  transition: transform 0.15s;
+}
+
+.review-card-inner:active {
+  transform: scale(0.97);
+}
+
+.review-card-icon {
+  width: 100rpx;
+  height: 100rpx;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  flex-shrink: 0;
+}
+
+.review-card-content {
+  flex: 1;
+}
+
+.review-card-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: white;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.review-card-desc {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.85);
+  display: block;
+}
+
+.review-card-arrow {
+  font-size: 48rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
 /* ====== 操作区域 ====== */
 .actions {
   margin-bottom: 32rpx;

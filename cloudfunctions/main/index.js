@@ -17,6 +17,217 @@ const BAIDU_SECRET_KEY = 'yHh8xH9BICC0ZH4oOEGAdZEeXemviwN6';
 let baiduAccessToken = null;
 let tokenExpireTime = 0;
 
+// ============================================================
+// V2.2 间隔重复算法（内嵌副本，与 utils/spaced-repetition.js 保持一致）
+// 云函数无法引用 utils 目录，必须内嵌
+// ============================================================
+var BOX_INTERVALS = [1, 3, 7, 14, 30];
+
+function calculateNextReview(boxLevel, isCorrect) {
+  var newLevel = updateBoxLevel(boxLevel, isCorrect);
+  var interval = BOX_INTERVALS[newLevel - 1];
+  var nextDate = new Date();
+  nextDate.setDate(nextDate.getDate() + interval);
+  var yyyy = nextDate.getFullYear();
+  var mm = String(nextDate.getMonth() + 1).padStart(2, '0');
+  var dd = String(nextDate.getDate()).padStart(2, '0');
+  return {
+    boxLevel: newLevel,
+    nextReviewDate: yyyy + '-' + mm + '-' + dd,
+    reviewInterval: interval
+  };
+}
+
+function updateBoxLevel(boxLevel, isCorrect) {
+  if (isCorrect) {
+    return Math.min(boxLevel + 1, 5);
+  }
+  return 1;
+}
+
+function updateMasteryStatus(currentStatus, progress, isCorrect) {
+  // 注意: isAssisted 和 exerciseType 的影响已在调用方通过调整 progress 计数器体现
+  // (recognition_correct/recall_correct 只在非辅助时累加)
+  var status = currentStatus || 'new';
+  var recognitionCorrect = (progress && progress.recognition_correct) || 0;
+  var recallCorrect = (progress && progress.recall_correct) || 0;
+  var crossDayCorrect = (progress && progress.cross_day_correct) || 0;
+  var consecutiveCorrect = (progress && progress.consecutive_correct) || 0;
+  var consecutiveWrong = (progress && progress.consecutive_wrong) || 0;
+  var boxLevel = (progress && progress.box_level) || 1;
+
+  // 降级规则（优先判断）
+  if ((status === 'mastered' || status === 'solid') && consecutiveWrong >= 2) {
+    return 'familiar';
+  }
+  if (status === 'familiar' && consecutiveWrong >= 2) {
+    return 'seeing';
+  }
+  if (status === 'seeing' && consecutiveWrong >= 2) {
+    return 'new';
+  }
+
+  // 答错不升级
+  if (!isCorrect) {
+    return status;
+  }
+
+  // 升级规则
+  if (status === 'new') {
+    return 'seeing';
+  }
+  if (status === 'seeing' && recognitionCorrect >= 2) {
+    return 'familiar';
+  }
+  if (status === 'familiar' && recallCorrect >= 2 && crossDayCorrect >= 1) {
+    return 'mastered';
+  }
+  if (status === 'mastered' && boxLevel === 5 && consecutiveCorrect >= 3) {
+    return 'solid';
+  }
+
+  return status;
+}
+
+function calculatePriority(progress, today) {
+  var nextReviewDate = (progress && progress.next_review_date) || null;
+  var maxInterval = BOX_INTERVALS[BOX_INTERVALS.length - 1];
+  var correctCount = (progress && progress.correct_count) || 0;
+  var wrongCount = (progress && progress.wrong_count) || 0;
+
+  var urgency = calculateUrgencyScore(nextReviewDate, maxInterval, today);
+  var difficulty = calculateDifficultyScore(correctCount, wrongCount);
+  var random = Math.random() * 100;
+
+  var priority = urgency * 0.5 + difficulty * 0.3 + random * 0.2;
+  return Math.min(100, Math.max(0, priority));
+}
+
+function calculateUrgencyScore(nextReviewDate, maxInterval, today) {
+  if (!nextReviewDate) {
+    return 100;
+  }
+  // 使用传入的 today 参数，避免服务器时区差异
+  var todayDate = today ? new Date(today + 'T00:00:00') : new Date();
+  var reviewDate = new Date(nextReviewDate + 'T00:00:00');
+  var diffMs = todayDate.getTime() - reviewDate.getTime();
+  var diffDays = diffMs / (1000 * 60 * 60 * 24);
+  var urgency = Math.max(0, diffDays / maxInterval) * 100;
+  return Math.min(100, urgency);
+}
+
+function calculateDifficultyScore(correctCount, wrongCount) {
+  if (correctCount === 0 && wrongCount === 0) {
+    return 50;
+  }
+  var total = correctCount + wrongCount;
+  var difficulty = (1 - correctCount / total) * 100;
+  return Math.min(100, Math.max(0, difficulty));
+}
+
+function migrateOldProgress(oldRecord, today) {
+  var oldStatus = (oldRecord && oldRecord.old_status) || 'new';
+  var correctCount = (oldRecord && oldRecord.correct_count) || 0;
+  var wrongCount = (oldRecord && oldRecord.wrong_count) || 0;
+  var openid = (oldRecord && oldRecord.openid) || '';
+  var charId = (oldRecord && oldRecord.char_id) || '';
+  var boxLevel = 1;
+  var status = 'new';
+  var nextReviewDate = today;
+  var reviewInterval = 1;
+
+  if (oldStatus === 'mastered') {
+    if (correctCount >= 5) {
+      boxLevel = 3;
+      status = 'familiar';
+      reviewInterval = BOX_INTERVALS[2];
+      var d1 = new Date(today + 'T00:00:00');
+      d1.setDate(d1.getDate() + 3);
+      var y1 = d1.getFullYear();
+      var m1 = String(d1.getMonth() + 1).padStart(2, '0');
+      var dd1 = String(d1.getDate()).padStart(2, '0');
+      nextReviewDate = y1 + '-' + m1 + '-' + dd1;
+    } else {
+      boxLevel = 2;
+      status = 'seeing';
+      reviewInterval = BOX_INTERVALS[1];
+      var d2 = new Date(today + 'T00:00:00');
+      d2.setDate(d2.getDate() + 1);
+      var y2 = d2.getFullYear();
+      var m2 = String(d2.getMonth() + 1).padStart(2, '0');
+      var dd2 = String(d2.getDate()).padStart(2, '0');
+      nextReviewDate = y2 + '-' + m2 + '-' + dd2;
+    }
+  } else if (oldStatus === 'learning') {
+    boxLevel = 1;
+    status = 'seeing';
+    nextReviewDate = today;
+    reviewInterval = BOX_INTERVALS[0];
+  } else {
+    boxLevel = 1;
+    status = 'new';
+    nextReviewDate = today;
+    reviewInterval = BOX_INTERVALS[0];
+  }
+
+  return {
+    openid: openid,
+    char_id: charId,
+    box_level: boxLevel,
+    status: status,
+    next_review_date: nextReviewDate,
+    review_interval: reviewInterval,
+    correct_count: correctCount,
+    wrong_count: wrongCount,
+    recognition_correct: 0,
+    recall_correct: 0,
+    cross_day_correct: 0,
+    consecutive_correct: 0,
+    consecutive_wrong: 0,
+    last_review_date: today,
+    last_correct_date: '',
+    is_assisted: false,
+    error_type: '',
+    error_count_by_type: { shape_similar: 0, sound_similar: 0, stroke: 0, general: 0 },
+    created_at: new Date(),
+    updated_at: new Date()
+  };
+}
+
+function createDefaultProgress(openid, charId) {
+  var todayObj = new Date();
+  var yyyy = todayObj.getFullYear();
+  var mm = String(todayObj.getMonth() + 1).padStart(2, '0');
+  var dd = String(todayObj.getDate()).padStart(2, '0');
+  var today = yyyy + '-' + mm + '-' + dd;
+
+  return {
+    openid: openid,
+    char_id: charId,
+    box_level: 1,
+    status: 'new',
+    next_review_date: today,
+    review_interval: BOX_INTERVALS[0],
+    correct_count: 0,
+    wrong_count: 0,
+    recognition_correct: 0,
+    recall_correct: 0,
+    cross_day_correct: 0,
+    consecutive_correct: 0,
+    consecutive_wrong: 0,
+    error_type: '',
+    error_count_by_type: { shape_similar: 0, sound_similar: 0, stroke: 0, general: 0 },
+    last_review_date: '',
+    last_correct_date: '',
+    is_assisted: false,
+    created_at: new Date(),
+    updated_at: new Date()
+  };
+}
+// ============================================================
+// 间隔重复算法 END
+// ============================================================
+
 // 成就配置
 const ACHIEVEMENTS = [
   { id: 'ACH001', name: '初次识字', requirement: 1, icon: '🎓', reward: { type: 'star', amount: 3 } },
@@ -206,7 +417,7 @@ function comparePinyin(target, result) {
   if (t.charAt(0) === r.charAt(0)) {
     var shengmu = ['b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's', 'y', 'w'];
     for (var i = 0; i < shengmu.length; i++) {
-      if (t.startsWith(shengmu[i]) && r.startsWith(shengmu[i])) {
+      if (t.indexOf(shengmu[i]) === 0 && r.indexOf(shengmu[i]) === 0) {
         return 0.75;
       }
     }
@@ -436,66 +647,142 @@ exports.main = async (event, context) => {
         return { success: true, rewards, mastered: true };
       }
 
+      // ============================================================
+      // V2.2: getPendingReview - 使用间隔重复优先级算法
+      // ============================================================
       case 'getPendingReview': {
         const { openid, limit = 10 } = data;
-        const userRes = await db.collection('users').where({ openid }).get();
-        if (!userRes.data || userRes.data.length === 0) {
-          return { success: true, data: [] };
-        }
-
-        const user = userRes.data[0];
-        const masteredIds = (user.mastered_chars || []).map(id => String(id));
-        if (masteredIds.length === 0) {
-          return { success: true, data: [] };
-        }
 
         // 获取今日日期
-        const today = new Date().toISOString().split('T')[0];
+        var todayObj = new Date();
+        var todayYYYY = todayObj.getFullYear();
+        var todayMM = String(todayObj.getMonth() + 1).padStart(2, '0');
+        var todayDD = String(todayObj.getDate()).padStart(2, '0');
+        var today = todayYYYY + '-' + todayMM + '-' + todayDD;
 
-        // 尝试从 learning_progress 表获取优先级信息
-        let priorityMap = {};
+        // 查询 learning_progress：next_review_date <= today 或 next_review_date 为空
+        var progressRecords = [];
         try {
-          const progressRes = await db.collection('learning_progress')
-            .where({ openid })
+          // 查询 next_review_date <= today 的记录
+          var dueRes = await db.collection('learning_progress')
+            .where({
+              openid: openid,
+              next_review_date: _.lte(today)
+            })
             .get();
+          progressRecords = dueRes.data || [];
 
-          // 构建优先级映射: priority = todayLearned*100 + wrongCount*10 + random
-          for (const p of progressRes.data) {
-            const charId = p.char_id;
-            const todayLearned = (p.last_learn_date === today) ? 100 : 0;
-            const wrongBonus = (p.wrong_review_count || 0) * 10;
-            const randomVal = Math.floor(Math.random() * 5);
-            priorityMap[charId] = todayLearned + wrongBonus + randomVal;
+          // 查询 next_review_date 不存在的旧记录
+          var noDateRes = await db.collection('learning_progress')
+            .where({
+              openid: openid,
+              next_review_date: _.eq(null)
+            })
+            .get();
+          var noDateRecords = noDateRes.data || [];
+
+          // 合并去重
+          var existingIds = {};
+          for (var pi = 0; pi < progressRecords.length; pi++) {
+            existingIds[progressRecords[pi]._id] = true;
+          }
+          for (var ni = 0; ni < noDateRecords.length; ni++) {
+            if (!existingIds[noDateRecords[ni]._id]) {
+              progressRecords.push(noDateRecords[ni]);
+            }
           }
         } catch (e) {
-          // learning_progress 表可能不存在，使用默认优先级
+          console.error('getPendingReview query error:', e.message);
+          // learning_progress 表可能不存在，回退到旧逻辑
+          var userRes = await db.collection('users').where({ openid: openid }).get();
+          if (!userRes.data || userRes.data.length === 0) {
+            return { success: true, data: [], count: 0 };
+          }
+          var user = userRes.data[0];
+          var masteredIds = (user.mastered_chars || []).map(function(id) { return String(id); });
+          if (masteredIds.length === 0) {
+            return { success: true, data: [], count: 0 };
+          }
+          var charsRes = await db.collection('characters').limit(2256).get();
+          var allChars = charsRes.data;
+          var masteredChars = allChars.filter(function(c) {
+            var idStr = String(c.id || '');
+            var _idStr = String(c._id || '');
+            return masteredIds.some(function(mid) { return mid === idStr || mid === _idStr; });
+          });
+          masteredChars.sort(function() { return Math.random() - 0.5; });
+          return {
+            success: true,
+            data: masteredChars.slice(0, limit).map(function(c) {
+              return {
+                id: c.id || c._id,
+                char: c.char,
+                pinyin: c.pinyin,
+                strokes: c.strokes || 0,
+                words: c.words || [],
+                meaning: c.meaning || '',
+                image_url: c.image_url || '',
+                progress: { box_level: 1, status: 'new', next_review_date: '', consecutive_correct: 0, consecutive_wrong: 0 }
+              };
+            }),
+            count: masteredChars.length
+          };
         }
 
-        // 获取所有汉字，在内存中过滤
-        const charsRes = await db.collection('characters').limit(2256).get();
-        const allChars = charsRes.data;
+        if (progressRecords.length === 0) {
+          return { success: true, data: [], count: 0 };
+        }
 
-        // 过滤出已掌握的汉字（id 和 _id 都要匹配，字符串比较）
-        const masteredChars = allChars.filter(c => {
-          const idStr = String(c.id || '');
-          const _idStr = String(c._id || '');
-          return masteredIds.some(mid => mid === idStr || mid === _idStr);
+        // 计算优先级并排序
+        for (var pri = 0; pri < progressRecords.length; pri++) {
+          progressRecords[pri]._priority = calculatePriority(progressRecords[pri], today);
+        }
+        progressRecords.sort(function(a, b) {
+          return b._priority - a._priority;
         });
 
-        // 如果有优先级信息，按优先级排序
-        if (Object.keys(priorityMap).length > 0) {
-          masteredChars.sort((a, b) => {
-            const pA = priorityMap[a.id || a._id] || 0;
-            const pB = priorityMap[b.id || b._id] || 0;
-            return pB - pA; // 降序
-          });
-        } else {
-          // 随机打乱
-          masteredChars.sort(() => Math.random() - 0.5);
+        // 取前 limit 条
+        var topRecords = progressRecords.slice(0, limit);
+
+        // 查 characters 集合补充字详情
+        var charIds = topRecords.map(function(r) { return r.char_id; });
+        var charsRes2 = await db.collection('characters').limit(2256).get();
+        var allChars2 = charsRes2.data;
+        var charMap = {};
+        for (var ci = 0; ci < allChars2.length; ci++) {
+          var c = allChars2[ci];
+          var cId = String(c.id || c._id || '');
+          charMap[cId] = c;
         }
 
-        // 返回前limit个
-        return { success: true, data: masteredChars.slice(0, limit) };
+        var result = [];
+        for (var ri = 0; ri < topRecords.length; ri++) {
+          var rec = topRecords[ri];
+          var charId = String(rec.char_id || '');
+          var charInfo = charMap[charId] || {};
+          result.push({
+            id: charInfo.id || charInfo._id || charId,
+            char: charInfo.char || '',
+            pinyin: charInfo.pinyin || '',
+            strokes: charInfo.strokes || 0,
+            words: charInfo.words || [],
+            meaning: charInfo.meaning || '',
+            image_url: charInfo.image_url || '',
+            progress: {
+              box_level: rec.box_level || 1,
+              status: rec.status || 'new',
+              next_review_date: rec.next_review_date || '',
+              consecutive_correct: rec.consecutive_correct || 0,
+              consecutive_wrong: rec.consecutive_wrong || 0
+            }
+          });
+        }
+
+        return {
+          success: true,
+          data: result,
+          count: progressRecords.length
+        };
       }
 
       case 'getAchievements': {
@@ -615,27 +902,167 @@ exports.main = async (event, context) => {
         return { success: true, data: { char: { id: targetId, char: char.char, pinyin: char.pinyin }, options: options.slice(0, 4) } };
       }
 
+      // ============================================================
+      // V2.2: recordReview - 从"只写日志"升级为"三写"
+      // 1) 写 review_logs
+      // 2) 读/创建 learning_progress
+      // 3) 更新 learning_progress
+      // ============================================================
       case 'recordReview': {
-        // 记录复习结果到review_logs表
-        const { openid, charId, reviewMode, isCorrect, isAssisted = false, asrScore = null } = data;
+        var reviewOpenid = data.openid;
+        var reviewCharId = data.charId;
+        var reviewMode = data.reviewMode;
+        var reviewIsCorrect = data.isCorrect;
+        var reviewIsAssisted = data.isAssisted || false;
+        var reviewAsrScore = data.asrScore || null;
+        var reviewExerciseType = data.exerciseType || 'recognition';
+
         try {
+          // --- 写1: review_logs ---
           await db.collection('review_logs').add({
             data: {
-              openid,
-              char_id: charId,
+              openid: reviewOpenid,
+              char_id: reviewCharId,
               review_mode: reviewMode === 'listen' ? 1 : 2,
-              is_correct: isCorrect,
-              is_assisted: isAssisted,
-              status: isAssisted ? 'pending' : 'confirmed',
-              asr_score: asrScore,
+              is_correct: reviewIsCorrect,
+              is_assisted: reviewIsAssisted,
+              exercise_type: reviewExerciseType,
+              status: reviewIsAssisted ? 'pending' : 'confirmed',
+              asr_score: reviewAsrScore,
               reviewed_at: new Date()
             }
           });
-          return { success: true };
         } catch (err) {
-          // 如果表不存在，返回成功（避免前端错误）
-          console.error('recordReview error:', err.message);
-          return { success: true };
+          console.error('recordReview log error:', err.message);
+        }
+
+        try {
+          // --- 写2: 读/创建 learning_progress ---
+          var todayDate = new Date();
+          var todayStr = todayDate.getFullYear() + '-' + String(todayDate.getMonth() + 1).padStart(2, '0') + '-' + String(todayDate.getDate()).padStart(2, '0');
+
+          var progressRes = await db.collection('learning_progress')
+            .where({ openid: reviewOpenid, char_id: reviewCharId })
+            .get();
+
+          var progressRecord = null;
+          if (progressRes.data && progressRes.data.length > 0) {
+            progressRecord = progressRes.data[0];
+          } else {
+            // 无记录则创建默认进度
+            var defaultProgress = createDefaultProgress(reviewOpenid, reviewCharId);
+            var addRes = await db.collection('learning_progress').add({ data: defaultProgress });
+            // 重新查询以获取完整记录（含 _id）
+            var newProgressRes = await db.collection('learning_progress')
+              .where({ openid: reviewOpenid, char_id: reviewCharId })
+              .get();
+            progressRecord = newProgressRes.data && newProgressRes.data.length > 0 ? newProgressRes.data[0] : defaultProgress;
+          }
+
+          var currentBoxLevel = progressRecord.box_level || 1;
+          var currentStatus = progressRecord.status || 'new';
+          var previousStatus = currentStatus;
+          var previousBoxLevel = currentBoxLevel;
+
+          // --- 写3: 更新 learning_progress ---
+          var newBoxLevel = updateBoxLevel(currentBoxLevel, reviewIsCorrect);
+          var nextReviewResult = calculateNextReview(currentBoxLevel, reviewIsCorrect);
+
+          // 构建传入 updateMasteryStatus 的 progress 对象（含更新后的计数）
+          var progressForStatus = {
+            recognition_correct: progressRecord.recognition_correct || 0,
+            recall_correct: progressRecord.recall_correct || 0,
+            cross_day_correct: progressRecord.cross_day_correct || 0,
+            consecutive_correct: reviewIsCorrect ? (progressRecord.consecutive_correct || 0) + 1 : 0,
+            consecutive_wrong: reviewIsCorrect ? 0 : (progressRecord.consecutive_wrong || 0) + 1,
+            box_level: newBoxLevel,
+            is_assisted: reviewIsAssisted
+          };
+
+          // 注意: recognition_correct 和 recall_correct 需要在状态判断前先加上本次的
+          if (reviewExerciseType === 'recognition' && reviewIsCorrect && !reviewIsAssisted) {
+            progressForStatus.recognition_correct += 1;
+          }
+          if (reviewExerciseType === 'recall' && reviewIsCorrect && !reviewIsAssisted) {
+            progressForStatus.recall_correct += 1;
+          }
+
+          // cross_day_correct: isCorrect && last_correct_date != today → +1
+          var lastCorrectDate = progressRecord.last_correct_date || '';
+          if (reviewIsCorrect && lastCorrectDate !== todayStr) {
+            progressForStatus.cross_day_correct += 1;
+          }
+
+          var newStatus = updateMasteryStatus(currentStatus, progressForStatus, reviewIsCorrect);
+
+          // 构建更新数据
+          var updateData = {
+            box_level: newBoxLevel,
+            status: newStatus,
+            next_review_date: nextReviewResult.nextReviewDate,
+            review_interval: nextReviewResult.reviewInterval,
+            last_review_date: todayStr,
+            is_assisted: reviewIsAssisted,
+            updated_at: new Date()
+          };
+
+          // 首次学习日期：status 从 new 变为其他状态时记录
+          if (currentStatus === 'new' && newStatus !== 'new' && !progressRecord.first_learn_date) {
+            updateData.first_learn_date = todayStr;
+          }
+
+          // consecutive_correct / consecutive_wrong: 答对+1/归零, 答错+1/归零
+          if (reviewIsCorrect) {
+            updateData.consecutive_correct = _.inc(1);
+            updateData.consecutive_wrong = 0;
+            updateData.correct_count = _.inc(1);
+            updateData.last_correct_date = todayStr;
+          } else {
+            updateData.consecutive_correct = 0;
+            updateData.consecutive_wrong = _.inc(1);
+            updateData.wrong_count = _.inc(1);
+            updateData.error_type = 'general';
+            updateData['error_count_by_type.general'] = _.inc(1);
+            // last_correct_date 保持不变，不设置
+          }
+
+          // recognition_correct: exerciseType==='recognition' && isCorrect && !isAssisted → +1
+          if (reviewExerciseType === 'recognition' && reviewIsCorrect && !reviewIsAssisted) {
+            updateData.recognition_correct = _.inc(1);
+          }
+
+          // recall_correct: exerciseType==='recall' && isCorrect && !isAssisted → +1
+          if (reviewExerciseType === 'recall' && reviewIsCorrect && !reviewIsAssisted) {
+            updateData.recall_correct = _.inc(1);
+          }
+
+          // cross_day_correct: isCorrect && last_correct_date != today → +1
+          if (reviewIsCorrect && lastCorrectDate !== todayStr) {
+            updateData.cross_day_correct = _.inc(1);
+          }
+
+          // 执行更新
+          await db.collection('learning_progress')
+            .where({ openid: reviewOpenid, char_id: reviewCharId })
+            .update({ data: updateData });
+
+          var statusChanged = (newStatus !== previousStatus);
+
+          return {
+            success: true,
+            newBoxLevel: newBoxLevel,
+            previousBoxLevel: previousBoxLevel,
+            newStatus: newStatus,
+            nextReviewDate: nextReviewResult.nextReviewDate,
+            reviewInterval: nextReviewResult.reviewInterval,
+            statusChanged: statusChanged,
+            previousStatus: previousStatus,
+            currentStatus: newStatus
+          };
+        } catch (err) {
+          console.error('recordReview progress error:', err.message);
+          // 即使进度更新失败，也返回成功（日志已写入）
+          return { success: true, progressError: err.message };
         }
       }
 
@@ -842,6 +1269,200 @@ exports.main = async (event, context) => {
             uniqueCount: uniqueChars.length
           }
         };
+      }
+
+      // ============================================================
+      // V2.2: migrateProgress - 数据迁移
+      // ============================================================
+      case 'migrateProgress': {
+        var migrateOpenid = data.openid;
+        var migratedCount = 0;
+        var skippedCount = 0;
+
+        var migrateTodayObj = new Date();
+        var migrateToday = migrateTodayObj.getFullYear() + '-' + String(migrateTodayObj.getMonth() + 1).padStart(2, '0') + '-' + String(migrateTodayObj.getDate()).padStart(2, '0');
+
+        try {
+          // 1. 获取 users 记录的 mastered_chars
+          var migrateUserRes = await db.collection('users').where({ _openid: migrateOpenid }).get();
+          if (!migrateUserRes.data || migrateUserRes.data.length === 0) {
+            // 尝试用 openid 字段查询
+            migrateUserRes = await db.collection('users').where({ openid: migrateOpenid }).get();
+          }
+          var migrateUser = migrateUserRes.data && migrateUserRes.data.length > 0 ? migrateUserRes.data[0] : null;
+          var masteredCharsArr = migrateUser ? (migrateUser.mastered_chars || []) : [];
+
+          // 2. 遍历 mastered_chars，为每个字创建 learning_progress（如果不存在）
+          for (var mi = 0; mi < masteredCharsArr.length; mi++) {
+            var mCharId = String(masteredCharsArr[mi]);
+            try {
+              var existRes = await db.collection('learning_progress')
+                .where({ openid: migrateOpenid, char_id: mCharId })
+                .get();
+
+              if (existRes.data && existRes.data.length > 0) {
+                skippedCount++;
+              } else {
+                // 旧"掌握"→ familiar+box3
+                // 保守估计 correct_count=5（旧"掌握"意味着至少学过一次）
+                var oldRecord = {
+                  openid: migrateOpenid,
+                  char_id: mCharId,
+                  old_status: 'mastered',
+                  correct_count: 5,
+                  wrong_count: 0
+                };
+                var migratedRecord = migrateOldProgress(oldRecord, migrateToday);
+                await db.collection('learning_progress').add({ data: migratedRecord });
+                migratedCount++;
+              }
+            } catch (e) {
+              console.error('migrateProgress char error:', mCharId, e.message);
+              skippedCount++;
+            }
+          }
+
+          // 3. 获取 learning_progress 中旧 status='learning' 的记录，执行 migrateOldProgress 更新
+          try {
+            var learningRes = await db.collection('learning_progress')
+              .where({ openid: migrateOpenid, status: 'learning' })
+              .get();
+
+            for (var li = 0; li < learningRes.data.length; li++) {
+              var learnRec = learningRes.data[li];
+              try {
+                var learnMigrateRecord = migrateOldProgress({
+                  openid: migrateOpenid,
+                  char_id: learnRec.char_id,
+                  old_status: 'learning',
+                  correct_count: learnRec.correct_count || 0,
+                  wrong_count: learnRec.wrong_count || 0
+                }, migrateToday);
+
+                await db.collection('learning_progress').doc(learnRec._id).update({
+                  data: {
+                    box_level: learnMigrateRecord.box_level,
+                    status: learnMigrateRecord.status,
+                    next_review_date: learnMigrateRecord.next_review_date,
+                    review_interval: learnMigrateRecord.review_interval,
+                    recognition_correct: learnMigrateRecord.recognition_correct,
+                    recall_correct: learnMigrateRecord.recall_correct,
+                    cross_day_correct: learnMigrateRecord.cross_day_correct,
+                    consecutive_correct: learnMigrateRecord.consecutive_correct,
+                    consecutive_wrong: learnMigrateRecord.consecutive_wrong,
+                    last_review_date: learnMigrateRecord.last_review_date,
+                    last_correct_date: learnMigrateRecord.last_correct_date,
+                    is_assisted: learnMigrateRecord.is_assisted,
+                    updated_at: new Date()
+                  }
+                });
+                migratedCount++;
+              } catch (e) {
+                console.error('migrateProgress learning update error:', learnRec._id, e.message);
+                skippedCount++;
+              }
+            }
+          } catch (e) {
+            console.error('migrateProgress learning query error:', e.message);
+          }
+
+          return { success: true, migratedCount: migratedCount, skippedCount: skippedCount };
+        } catch (err) {
+          console.error('migrateProgress error:', err.message);
+          return { success: false, error: err.message, migratedCount: migratedCount, skippedCount: skippedCount };
+        }
+      }
+
+      // ============================================================
+      // V2.2: getLearnChar - 获取单个字的详情+进度
+      // ============================================================
+      case 'getLearnChar': {
+        var getCharOpenid = data.openid;
+        var getCharId = data.charId;
+
+        try {
+          // 查询 characters 集合获取字详情
+          var charInfo = null;
+          try {
+            var charDocRes = await db.collection('characters').doc(getCharId).get();
+            if (charDocRes.data) {
+              charInfo = charDocRes.data;
+            }
+          } catch (e) {
+            // doc 查询失败，尝试用 id 字段查询
+          }
+
+          if (!charInfo) {
+            var charAllRes = await db.collection('characters').limit(2256).get();
+            for (var cai = 0; cai < charAllRes.data.length; cai++) {
+              if (String(charAllRes.data[cai]._id) === String(getCharId) || String(charAllRes.data[cai].id) === String(getCharId)) {
+                charInfo = charAllRes.data[cai];
+                break;
+              }
+            }
+          }
+
+          if (!charInfo) {
+            return { success: false, error: '汉字不存在' };
+          }
+
+          // 查询 learning_progress 获取学习进度
+          var charProgress = null;
+          try {
+            var charProgressRes = await db.collection('learning_progress')
+              .where({ openid: getCharOpenid, char_id: String(charInfo.id || charInfo._id) })
+              .get();
+
+            if (charProgressRes.data && charProgressRes.data.length > 0) {
+              charProgress = charProgressRes.data[0];
+            }
+          } catch (e) {
+            console.error('getLearnChar progress query error:', e.message);
+          }
+
+          // 无则创建默认进度
+          if (!charProgress) {
+            var defaultCharProgress = createDefaultProgress(getCharOpenid, String(charInfo.id || charInfo._id));
+            try {
+              await db.collection('learning_progress').add({ data: defaultCharProgress });
+            } catch (e) {
+              console.error('getLearnChar progress create error:', e.message);
+            }
+            charProgress = defaultCharProgress;
+          }
+
+          return {
+            success: true,
+            char: {
+              id: charInfo.id || charInfo._id,
+              char: charInfo.char,
+              pinyin: charInfo.pinyin,
+              strokes: charInfo.strokes || 0,
+              words: charInfo.words || [],
+              meaning: charInfo.meaning || '',
+              image_url: charInfo.image_url || ''
+            },
+            progress: {
+              box_level: charProgress.box_level || 1,
+              status: charProgress.status || 'new',
+              next_review_date: charProgress.next_review_date || '',
+              review_interval: charProgress.review_interval || 1,
+              correct_count: charProgress.correct_count || 0,
+              wrong_count: charProgress.wrong_count || 0,
+              recognition_correct: charProgress.recognition_correct || 0,
+              recall_correct: charProgress.recall_correct || 0,
+              cross_day_correct: charProgress.cross_day_correct || 0,
+              consecutive_correct: charProgress.consecutive_correct || 0,
+              consecutive_wrong: charProgress.consecutive_wrong || 0,
+              last_review_date: charProgress.last_review_date || '',
+              last_correct_date: charProgress.last_correct_date || '',
+              is_assisted: charProgress.is_assisted || false
+            }
+          };
+        } catch (err) {
+          console.error('getLearnChar error:', err.message);
+          return { success: false, error: err.message };
+        }
       }
 
       default:

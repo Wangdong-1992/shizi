@@ -1,4 +1,4 @@
-// 首页 - V2.0 愉悦体验版
+// 首页 - V2.2 间隔重复版
 var app = getApp();
 var Delight = require('../../utils/delight.js');
 
@@ -27,10 +27,40 @@ Page({
 
   onShow: function() {
     this.checkLoginStatus();
+    // V2.2: 首次访问时触发数据迁移
+    this.runMigrationIfNeeded();
   },
 
   onHide: function() {
     wx.showTabBar();
+  },
+
+  // ========== V2.2: 数据迁移 ==========
+  runMigrationIfNeeded: function() {
+    var self = this;
+    try {
+      var migrated = wx.getStorageSync('v22_migrated');
+      if (migrated) {
+        return;
+      }
+      var openid = app.globalData.openid;
+      if (!openid) {
+        return;
+      }
+      wx.cloud.callFunction({
+        name: 'main',
+        data: { action: 'migrateProgress', data: { openid: openid } },
+        success: function(res) {
+          console.log('V2.2 迁移完成:', JSON.stringify(res.result));
+          wx.setStorageSync('v22_migrated', true);
+        },
+        fail: function(err) {
+          console.error('V2.2 迁移失败:', err);
+        }
+      });
+    } catch (e) {
+      console.error('runMigrationIfNeeded error:', e);
+    }
   },
 
   // ========== 动态问候语 ==========
@@ -173,6 +203,7 @@ Page({
       var stats = results[0].result && results[0].result.data ? results[0].result.data : {};
       var achievements = results[1].result && results[1].result.data ? results[1].result.data : {};
       var pendingReview = results[2].result && results[2].result.data ? results[2].result.data : [];
+      var pendingReviewCount = results[2].result && results[2].result.count ? results[2].result.count : (pendingReview.length || 0);
       var user = results[3].result && results[3].result.data ? results[3].result.data : {};
 
       var masteredCount = stats.mastered_count || 0;
@@ -188,7 +219,7 @@ Page({
           flower_count: stats.flower_count || 0
         },
         remainingCount: 2256 - masteredCount,
-        pendingReviewCount: pendingReview.length,
+        pendingReviewCount: pendingReviewCount,
         achievements: achievements,
         loading: false,
         // 初始显示值置零

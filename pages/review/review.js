@@ -1,4 +1,4 @@
-// 复习页面 - V2.0 愉悦体验版
+// 复习页面 - V2.2 间隔重复增强版
 var app = getApp();
 var Delight = require('../../utils/delight.js');
 
@@ -31,11 +31,18 @@ Page({
     feedbackIcon: '',
     feedbackMsg: '',
 
+    // --- V2.2 Box等级变化提示 ---
+    boxChangeToast: '',          // Box变化提示文字
+    showBoxToast: false,         // 是否显示Box变化
+    statusChangeToast: '',       // 状态变化提示
+    showStatusToast: false,      // 是否显示状态变化
+    currentProgress: null,       // 当前字的进度信息
+
     // --- 粒子动画 ---
     showStars: false,
-    starParticles: [],
+    stars: [],
     showConfetti: false,
-    confettiPieces: [],
+    confetti: [],
 
     // --- 完成庆祝 ---
     showCompletion: false,
@@ -46,9 +53,15 @@ Page({
       rate: 0
     },
 
+    // --- V2.2 完成页 Box 分布统计 ---
+    boxDistribution: { box1: 0, box2: 0, box3: 0, box4: 0, box5: 0 },
+
     // --- 内部统计 ---
     _correctCount: 0,
     _maxCombo: 0,
+
+    // --- V2.2 内部：本轮 Box 变化记录 ---
+    _boxChanges: [],
 
     // --- ASR降级相关 ---
     showFallbackChoice: false,
@@ -114,6 +127,7 @@ Page({
       currentChar: currentChar.char,
       currentCharId: currentChar._id || currentChar.id,
       currentPinyin: currentChar.pinyin || '',
+      currentProgress: currentChar.progress || null,
       progressPercent: ((currentIndex) / totalCount) * 100,
       selectedId: null,
       answered: false,
@@ -122,11 +136,16 @@ Page({
       feedbackIcon: '',
       feedbackMsg: '',
       options: [],
-      // 不是第一题时重置粒子
+      // 重置粒子
       showStars: false,
-      starParticles: [],
+      stars: [],
       showConfetti: false,
-      confettiPieces: []
+      confetti: [],
+      // 重置Box变化提示
+      showBoxToast: false,
+      boxChangeToast: '',
+      showStatusToast: false,
+      statusChangeToast: ''
     });
 
     if (self.data.mode === 'listen') {
@@ -228,8 +247,11 @@ Page({
       answered: true
     });
 
+    // V2.2: 听音选字 = recognition 类型
+    var exerciseType = 'recognition';
+
     // 记录复习结果
-    self.recordReviewResult(self.data.currentCharId, isCorrect);
+    self.recordReviewResult(self.data.currentCharId, isCorrect, false, null, exerciseType);
 
     // 更新连击
     self.updateCombo(isCorrect);
@@ -238,7 +260,7 @@ Page({
       // 答对 → 震动 + 星星 + 表扬
       self.showFeedback('success', '✅', Delight.getPraise());
       try { Delight.vibrate('medium'); } catch (e) {}
-      try { self.setData({ showStars: true, starParticles: Delight.burstStars(8) }); } catch (e) {}
+      Delight.burstStars(self, 8);
     } else {
       // 答错 → 重震动 + 显示正确答案
       var correctOption = null;
@@ -253,7 +275,7 @@ Page({
     // 延迟进入下一题
     setTimeout(function() {
       self.nextQuestion();
-    }, 1800);
+    }, 2200);
   },
 
   // ========== 更新连击 ==========
@@ -312,23 +334,138 @@ Page({
     }, 1800);
   },
 
-  // ========== 记录复习结果 ==========
-  recordReviewResult: function(charId, isCorrect, isAssisted, asrScore) {
+  // ========== V2.2: 显示Box等级变化提示 ==========
+  showBoxChangeToast: function(newBoxLevel, previousBoxLevel) {
+    var self = this;
+    var toastText = '';
+
+    if (newBoxLevel > previousBoxLevel) {
+      // Box升级
+      var arrows = '';
+      var diff = newBoxLevel - previousBoxLevel;
+      for (var a = 0; a < diff; a++) { arrows += '⬆'; }
+      toastText = arrows + ' Box' + previousBoxLevel + ' → Box' + newBoxLevel;
+    } else if (newBoxLevel < previousBoxLevel) {
+      // Box降级
+      toastText = '⬇ Box' + previousBoxLevel + ' → Box' + newBoxLevel;
+    } else {
+      // Box不变
+      return;
+    }
+
+    self.setData({
+      showBoxToast: true,
+      boxChangeToast: toastText
+    });
+
+    setTimeout(function() {
+      self.setData({ showBoxToast: false, boxChangeToast: '' });
+    }, 2500);
+  },
+
+  // ========== V2.2: 显示状态变化提示 ==========
+  showStatusChangeToast: function(currentStatus, previousStatus) {
+    var self = this;
+    if (!currentStatus || !previousStatus) return;
+    if (currentStatus === previousStatus) return;
+
+    var statusLabels = {
+      'new': '初识',
+      'seeing': '认识',
+      'familiar': '熟悉',
+      'mastered': '掌握',
+      'solid': '牢固'
+    };
+
+    var prevLabel = statusLabels[previousStatus] || previousStatus;
+    var curLabel = statusLabels[currentStatus] || currentStatus;
+
+    var toastText = '';
+    var isUpgrade = self.isStatusUpgrade(previousStatus, currentStatus);
+    if (isUpgrade) {
+      toastText = '🎉 ' + prevLabel + ' → ' + curLabel;
+    } else {
+      toastText = prevLabel + ' → ' + curLabel;
+    }
+
+    // 延迟显示，避免与Box提示重叠
+    setTimeout(function() {
+      self.setData({
+        showStatusToast: true,
+        statusChangeToast: toastText
+      });
+
+      setTimeout(function() {
+        self.setData({ showStatusToast: false, statusChangeToast: '' });
+      }, 2500);
+    }, 800);
+
+    // 状态升级的额外庆祝
+    if (isUpgrade && (currentStatus === 'mastered' || currentStatus === 'solid')) {
+      setTimeout(function() {
+        try { Delight.vibrate('heavy'); } catch (e) {}
+        Delight.burstConfetti(self, 2500);
+      }, 1200);
+    }
+  },
+
+  // ========== V2.2: 判断状态是否升级 ==========
+  isStatusUpgrade: function(prevStatus, curStatus) {
+    var order = ['new', 'seeing', 'familiar', 'mastered', 'solid'];
+    var prevIdx = -1;
+    var curIdx = -1;
+    for (var i = 0; i < order.length; i++) {
+      if (order[i] === prevStatus) prevIdx = i;
+      if (order[i] === curStatus) curIdx = i;
+    }
+    return curIdx > prevIdx;
+  },
+
+  // ========== V2.2: 记录复习结果（增强版） ==========
+  recordReviewResult: function(charId, isCorrect, isAssisted, asrScore, exerciseType) {
+    var self = this;
+    var exType = exerciseType || 'recognition';
+
     wx.cloud.callFunction({
       name: 'main',
       data: {
         action: 'recordReview',
         data: {
-          openid: this.data.openid,
+          openid: self.data.openid,
           charId: charId,
-          reviewMode: this.data.mode,
+          reviewMode: self.data.mode,
           isCorrect: isCorrect,
           isAssisted: isAssisted || false,
-          asrScore: asrScore || null
+          asrScore: asrScore || null,
+          exerciseType: exType
         }
       }
     }).then(function(res) {
-      console.log('recordReview result:', res);
+      console.log('recordReview result:', JSON.stringify(res.result));
+      if (res.result && res.result.success) {
+        var newBoxLevel = res.result.newBoxLevel;
+        var previousBoxLevel = res.result.previousBoxLevel;
+        var currentStatus = res.result.currentStatus;
+        var previousStatus = res.result.previousStatus;
+        var statusChanged = res.result.statusChanged;
+
+        // 记录Box变化
+        if (newBoxLevel && previousBoxLevel && newBoxLevel !== previousBoxLevel) {
+          var boxChanges = self.data._boxChanges.slice();
+          boxChanges.push({
+            charId: charId,
+            from: previousBoxLevel,
+            to: newBoxLevel
+          });
+          self.setData({ _boxChanges: boxChanges });
+          self.showBoxChangeToast(newBoxLevel, previousBoxLevel);
+        }
+
+        // 显示状态变化
+        if (statusChanged && currentStatus && previousStatus) {
+          self.showStatusChangeToast(currentStatus, previousStatus);
+        }
+      }
     }).catch(function(err) {
       console.error('recordReview error:', err);
     });
@@ -437,19 +574,22 @@ Page({
     var self = this;
     var isCorrect = score >= 0.7;
     self.setData({ answered: true });
-    self.recordReviewResult(self.data.currentCharId, isCorrect, false, score);
+
+    // V2.2: 看字说音 = recall 类型
+    var exerciseType = 'recall';
+    self.recordReviewResult(self.data.currentCharId, isCorrect, false, score, exerciseType);
     self.updateCombo(isCorrect);
 
     if (isCorrect) {
       self.showFeedback('success', '✅', Delight.getPraise());
       try { Delight.vibrate('medium'); } catch (e) {}
-      try { self.setData({ showStars: true, starParticles: Delight.burstStars(6) }); } catch (e) {}
+      Delight.burstStars(self, 6);
     } else {
       self.showFeedback('error', '❌', '正确发音：' + self.data.currentPinyin);
       try { Delight.vibrate('heavy'); } catch (e) {}
     }
 
-    setTimeout(function() { self.nextQuestion(); }, 2000);
+    setTimeout(function() { self.nextQuestion(); }, 2200);
   },
 
   handleAsrFailure: function(reason) {
@@ -473,16 +613,21 @@ Page({
             fallbackOptions: res.result.data.options
           });
         } else {
-          // getOptions也失败，给一个简单提示
+          // ASR和降级选择题都不可用：记录为辅助错误，不丢题
           self.setData({ answered: true });
           self.showFeedback('info', '🔄', '识别暂不可用，请重试');
+          self.recordReviewResult(self.data.currentCharId, false, true, null, 'recognition');
+          self.updateCombo(false);
           setTimeout(function() { self.nextQuestion(); }, 2000);
         }
       },
       fail: function(err) {
         console.error('getOptions失败:', err);
+        // 选择题也失败：记录为辅助错误，不丢题
         self.setData({ answered: true });
         self.showFeedback('info', '🔄', '识别暂不可用，请重试');
+        self.recordReviewResult(self.data.currentCharId, false, true, null, 'recognition');
+        self.updateCombo(false);
         setTimeout(function() { self.nextQuestion(); }, 2000);
       }
     });
@@ -508,7 +653,9 @@ Page({
       selectedId: selectedId
     });
 
-    self.recordReviewResult(self.data.currentCharId, isCorrect, true, null);
+    // V2.2: 降级选择 = recognition 类型（辅助完成）
+    var exerciseType = 'recognition';
+    self.recordReviewResult(self.data.currentCharId, isCorrect, true, null, exerciseType);
     self.updateCombo(isCorrect);
 
     if (isCorrect) {
@@ -540,20 +687,23 @@ Page({
       selectedId: null,
       options: [],
       showStars: false,
-      starParticles: [],
+      stars: [],
       showConfetti: false,
-      confettiPieces: []
+      confetti: [],
+      showBoxToast: false,
+      boxChangeToast: '',
+      showStatusToast: false,
+      statusChangeToast: ''
     });
     self.showCurrentQuestion();
   },
 
-  // ========== 完成复习 ==========
+  // ========== V2.2: 完成复习（增强版 + Box 分布统计） ==========
   finishReview: function() {
     var self = this;
     var correctCount = self.data._correctCount;
     var totalCount = self.data.totalCount;
     var maxCombo = self.data._maxCombo;
-    // 如果连击还在进行中，也计入
     maxCombo = Math.max(maxCombo, self.data.comboCount);
     var rate = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
@@ -563,34 +713,45 @@ Page({
       comboCount: 0,
       feedbackType: '',
       feedbackIcon: '',
-      feedbackMsg: ''
+      feedbackMsg: '',
+      showBoxToast: false,
+      boxChangeToast: '',
+      showStatusToast: false,
+      statusChangeToast: ''
     });
 
+    // 计算本轮Box分布统计
+    var boxDistribution = { box1: 0, box2: 0, box3: 0, box4: 0, box5: 0 };
+    var boxChanges = self.data._boxChanges;
+    for (var b = 0; b < boxChanges.length; b++) {
+      var targetBox = boxChanges[b].to;
+      var boxKey = 'box' + targetBox;
+      if (boxDistribution.hasOwnProperty(boxKey)) {
+        boxDistribution[boxKey]++;
+      }
+    }
+
     // 先来一波星星
-    try { self.setData({ showStars: true, starParticles: Delight.burstStars(15) }); } catch (e) {}
+    Delight.burstStars(self, 15);
 
     // 延迟显示完成庆祝
     setTimeout(function() {
       self.setData({
         showStars: false,
-        starParticles: [],
+        stars: [],
         showCompletion: true,
         completionData: {
           correct: correctCount,
           total: totalCount,
           maxCombo: maxCombo,
           rate: rate
-        }
+        },
+        boxDistribution: boxDistribution
       });
 
       // 烟花
-      try { self.setData({ showConfetti: true, confettiPieces: Delight.burstConfetti(30) }); } catch (e) {}
+      Delight.burstConfetti(self, 3000);
       try { Delight.vibrate('heavy'); } catch (e) {}
-
-      // 清理烟花
-      setTimeout(function() {
-        self.setData({ showConfetti: false, confettiPieces: [] });
-      }, 3000);
     }, 800);
   },
 
@@ -599,20 +760,26 @@ Page({
     this.setData({
       showCompletion: false,
       showConfetti: false,
-      confettiPieces: [],
+      confetti: [],
       comboCount: 0,
       showCombo: false,
       comboLevel: '',
       comboIcon: '',
       _correctCount: 0,
       _maxCombo: 0,
+      _boxChanges: [],
+      boxDistribution: { box1: 0, box2: 0, box3: 0, box4: 0, box5: 0 },
       currentIndex: 0,
       answered: false,
       selectedId: null,
       options: [],
       feedbackType: '',
       feedbackIcon: '',
-      feedbackMsg: ''
+      feedbackMsg: '',
+      showBoxToast: false,
+      boxChangeToast: '',
+      showStatusToast: false,
+      statusChangeToast: ''
     });
     this.loadReview();
   }

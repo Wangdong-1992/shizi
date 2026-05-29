@@ -1,0 +1,102 @@
+classDiagram
+    class SpacedRepetition {
+        +BOX_INTERVALS: Number[]$
+        +STATUS_FLOW: Object$
+        +calculateNextReview(boxLevel: Number, isCorrect: Boolean) Object
+        +updateBoxLevel(boxLevel: Number, isCorrect: Boolean) Number
+        +updateMasteryStatus(currentStatus: String, progress: Object, isCorrect: Boolean, isAssisted: Boolean, exerciseType: String) String
+        +calculatePriority(progress: Object, today: String) Number
+        +calculateUrgencyScore(nextReviewDate: String, maxInterval: Number) Number
+        +calculateDifficultyScore(correctCount: Number, wrongCount: Number) Number
+        +migrateOldProgress(oldRecord: Object, today: String) Object
+        +createDefaultProgress(openid: String, charId: String) Object
+    }
+
+    class LearnPage {
+        +data: Object
+        +currentStep: Number
+        +onLoad(options: Object) void
+        +initCharData() void
+        +goToStep(step: Number) void
+        +onStep1Complete() void
+        +onStep2Select(e: Object) void
+        +onStep3StrokeComplete() void
+        +onStep4Record() void
+        +processRecording(filePath: String) void
+        +handleAsrSuccess(score: Number, transcript: String) void
+        +handleAsrFailure(reason: String) void
+        +selectFallbackOption(e: Object) void
+        +submitLearnResult() void
+        +startRecord() void
+        +stopRecord() void
+    }
+
+    class ReviewPage {
+        +data: Object
+        +processRecording(filePath: String) void
+        +handleAsrSuccess(score: Number, transcript: String) void
+        +handleAsrFailure(reason: String) void
+        +loadFallbackOptions() void
+        +selectFallbackOption(e: Object) void
+        +selectOption(e: Object) void
+        +recordReviewResult(charId: String, isCorrect: Boolean, isAssisted: Boolean, exerciseType: String) void
+        +updateCombo(isCorrect: Boolean) void
+        +showFeedback(type: String, icon: String, msg: String) void
+        +showBoxChangeFeedback(oldLevel: Number, newLevel: Number) void
+        +showStatusChangeFeedback(oldStatus: String, newStatus: String) void
+    }
+
+    class CloudFunctionMain {
+        +recognizeVoice(fileID: String, targetPinyin: String) Object
+        +recordReview(data: Object) Object
+        +recordLearn(data: Object) Object
+        +getOptions(charId: String) Object
+        +getPendingReview(data: Object) Object
+        +migrateProgress(data: Object) Object
+        +getLearnChar(data: Object) Object
+    }
+
+    class LearningProgressRecord {
+        +_id: String
+        +openid: String
+        +char_id: String
+        +status: String
+        +box_level: Number
+        +correct_count: Number
+        +wrong_count: Number
+        +consecutive_correct: Number
+        +consecutive_wrong: Number
+        +recognition_correct: Number
+        +recall_correct: Number
+        +cross_day_correct: Number
+        +first_learn_date: Date
+        +last_correct_date: Date
+        +last_review_date: Date
+        +next_review_date: Date
+        +review_interval: Number
+        +error_type: String
+        +error_count_by_type: Object
+        +is_assisted: Boolean
+        +created_at: Date
+        +updated_at: Date
+    }
+
+    class ReviewLogRecord {
+        +openid: String
+        +char_id: String
+        +review_mode: Number
+        +is_correct: Boolean
+        +is_assisted: Boolean
+        +status: String
+        +asr_score: Number
+        +exercise_type: String
+        +reviewed_at: Date
+    }
+
+    SpacedRepetition --> LearningProgressRecord : 计算更新字段
+    LearnPage --> CloudFunctionMain : 调用
+    LearnPage --> SpacedRepetition : 本地预判(仅UI)
+    ReviewPage --> CloudFunctionMain : 调用
+    CloudFunctionMain --> SpacedRepetition : 内嵌模块
+    CloudFunctionMain --> ReviewLogRecord : 写入review_logs
+    CloudFunctionMain --> LearningProgressRecord : 读写learning_progress

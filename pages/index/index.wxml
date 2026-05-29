@@ -36,6 +36,18 @@
       </view>
     </view>
 
+    <!-- V2.2: 今日待复习入口卡片 -->
+    <view class="review-card entrance-item{{entranceReady ? ' entrance-slide-up review-card-anim' : ''}}" bindtap="startReview" wx:if="{{pendingReviewCount > 0}}">
+      <view class="review-card-inner">
+        <view class="review-card-icon">🔄</view>
+        <view class="review-card-content">
+          <text class="review-card-title">今日待复习</text>
+          <text class="review-card-desc">有 {{pendingReviewCount}} 个字需要巩固复习</text>
+        </view>
+        <text class="review-card-arrow">›</text>
+      </view>
+    </view>
+
     <!-- 操作区域 -->
     <view class="actions entrance-item{{entranceReady ? ' entrance-slide-up actions-anim' : ''}}">
       <text class="section-title">开始学习</text>

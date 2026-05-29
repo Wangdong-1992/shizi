@@ -1,0 +1,67 @@
+sequenceDiagram
+    participant User as 用户
+    participant Learn as learn.js
+    participant SR as spaced-repetition.js
+    participant Cloud as 云函数main
+    participant DB as 云数据库
+
+    User->>Learn: 进入学习页(charId)
+    Learn->>Cloud: getLearnChar(openid, charId)
+    Cloud->>DB: characters.get(charId)
+    Cloud->>DB: learning_progress.where({openid, char_id}).get()
+    alt 无progress记录
+        Cloud->>DB: learning_progress.add(defaultProgress)
+    end
+    Cloud-->>Learn: {char, progress, strokes}
+
+    Note over Learn,User: ===== Step1: 展示释义 (~30秒) =====
+    Learn->>Learn: goToStep(1) - setData({currentStep:1, showStep1:true})
+    Learn->>Learn: 播放字音 + 显示配图 + 动画释义 + 组词
+    User->>Learn: 点击"我认识了" / 自动30秒
+    Learn->>Learn: onStep1Complete() - stepCompleted[0]=true
+
+    Note over Learn,User: ===== Step2: 再认练习 (~30秒) =====
+    Learn->>Learn: goToStep(2) - setData({currentStep:2})
+    Learn->>Cloud: getOptions(charId) - 获取3选1选项
+    Cloud-->>Learn: {options: [{id, char, isCorrect}, ...]}
+    Learn->>Learn: setData({step2Options: options})
+    User->>Learn: onStep2Select(选择选项)
+    Learn->>Learn: 判定isCorrect, stepCompleted[1]=true
+    Learn->>Learn: stepResults[1] = {isCorrect, isAssisted:false, exerciseType:recognition}
+
+    Note over Learn,User: ===== Step3: 描红书写 (~40秒) =====
+    Learn->>Learn: goToStep(3) - setData({currentStep:3, strokePaths, strokeIndex:0})
+    Learn->>Learn: 显示第一笔引导线
+    User->>Learn: 手指跟随引导线描红
+    Learn->>Learn: onTouchMove - 判定轨迹匹配度
+    Learn->>Learn: 单笔完成 → strokeIndex++，下一笔
+    Learn->>Learn: 全部笔画完成 → onStep3StrokeComplete()
+    Learn->>Learn: stepCompleted[2]=true, stepResults[2]={isCorrect:true, exerciseType:recall}
+
+    Note over Learn,User: ===== Step4: 跟读产出 (~30秒) =====
+    Learn->>Learn: goToStep(4) - setData({currentStep:4})
+    User->>Learn: 按住跟读录音
+    Learn->>Cloud: uploadFile → recognizeVoice
+    alt ASR成功
+        Cloud-->>Learn: {success:true, score:0.85, isCorrect:true}
+        Learn->>Learn: stepResults[3]={isCorrect:true, isAssisted:false, exerciseType:recall}
+    else ASR失败
+        Cloud-->>Learn: {success:false, reason:asr_empty}
+        Learn->>Cloud: getOptions(charId)
+        Cloud-->>Learn: {options:[...]}
+        Learn->>Learn: setData({showChoiceMode:true})
+        User->>Learn: selectFallbackOption
+        Learn->>Learn: stepResults[3]={isCorrect, isAssisted:true, exerciseType:recall}
+    end
+    Learn->>Learn: stepCompleted[3]=true
+
+    Note over Learn,User: ===== 提交学习结果 =====
+    Learn->>Learn: submitLearnResult()
+    Learn->>Cloud: recordLearn(openid, charId, stepResults)
+    Cloud->>DB: review_logs.add(每步结果)
+    Cloud->>SR: updateMasteryStatus(当前status, progress, isCorrect, isAssisted, exerciseType)
+    Cloud->>SR: calculateNextReview(boxLevel, isCorrect)
+    Cloud->>DB: learning_progress.update({status, box_level, next_review_date, ...})
+    Cloud->>DB: users.update({mastered_chars})
+    Cloud-->>Learn: {success:true, data:{newStatus, newBoxLevel}}
+    Learn->>Learn: showFeedback + celebrateAnimation
