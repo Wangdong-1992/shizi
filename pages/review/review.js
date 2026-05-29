@@ -48,7 +48,13 @@ Page({
 
     // --- 内部统计 ---
     _correctCount: 0,
-    _maxCombo: 0
+    _maxCombo: 0,
+
+    // --- ASR降级相关 ---
+    showFallbackChoice: false,
+    fallbackOptions: [],
+    fallbackReason: '',
+    asrProcessing: false
   },
 
   onLoad: function() {
@@ -307,7 +313,7 @@ Page({
   },
 
   // ========== 记录复习结果 ==========
-  recordReviewResult: function(charId, isCorrect) {
+  recordReviewResult: function(charId, isCorrect, isAssisted, asrScore) {
     wx.cloud.callFunction({
       name: 'main',
       data: {
@@ -316,7 +322,9 @@ Page({
           openid: this.data.openid,
           charId: charId,
           reviewMode: this.data.mode,
-          isCorrect: isCorrect
+          isCorrect: isCorrect,
+          isAssisted: isAssisted || false,
+          asrScore: asrScore || null
         }
       }
     }).then(function(res) {
@@ -339,7 +347,7 @@ Page({
       console.log('录音开始');
     });
     recorderManager.onStop(function(res) {
-      self.processRecording();
+      self.processRecording(res.tempFilePath);
     });
     recorderManager.onError(function(err) {
       console.error('录音错误', err);
@@ -381,12 +389,55 @@ Page({
   },
 
   // ========== 处理录音结果 ==========
-  processRecording: function() {
+  processRecording: function(filePath) {
     var self = this;
-    var isCorrect = Math.random() > 0.3;
+    self.setData({ asrProcessing: true });
 
+    // 上传录音到云存储
+    wx.cloud.uploadFile({
+      cloudPath: 'audio/review_' + Date.now() + '.mp3',
+      filePath: filePath,
+      success: function(uploadRes) {
+        var fileID = uploadRes.fileID;
+        // 调用ASR识别
+        wx.cloud.callFunction({
+          name: 'main',
+          data: {
+            action: 'recognizeVoice',
+            data: {
+              fileID: fileID,
+              targetPinyin: self.data.currentPinyin
+            }
+          },
+          success: function(res) {
+            self.setData({ asrProcessing: false });
+            if (res.result && res.result.success) {
+              self.handleAsrSuccess(res.result.score, res.result.recognized);
+            } else {
+              var reason = (res.result && res.result.reason) || 'unknown';
+              self.handleAsrFailure(reason);
+            }
+          },
+          fail: function(err) {
+            console.error('ASR调用失败:', err);
+            self.setData({ asrProcessing: false });
+            self.handleAsrFailure('network_failed');
+          }
+        });
+      },
+      fail: function(err) {
+        console.error('上传失败:', err);
+        self.setData({ asrProcessing: false });
+        self.handleAsrFailure('upload_failed');
+      }
+    });
+  },
+
+  handleAsrSuccess: function(score, recognized) {
+    var self = this;
+    var isCorrect = score >= 0.7;
     self.setData({ answered: true });
-    self.recordReviewResult(self.data.currentCharId, isCorrect);
+    self.recordReviewResult(self.data.currentCharId, isCorrect, false, score);
     self.updateCombo(isCorrect);
 
     if (isCorrect) {
@@ -398,9 +449,77 @@ Page({
       try { Delight.vibrate('heavy'); } catch (e) {}
     }
 
-    setTimeout(function() {
-      self.nextQuestion();
-    }, 2000);
+    setTimeout(function() { self.nextQuestion(); }, 2000);
+  },
+
+  handleAsrFailure: function(reason) {
+    var self = this;
+    console.log('ASR失败，降级为选择题, 原因:', reason);
+    self.setData({ fallbackReason: reason });
+
+    // 调用getOptions获取选择题选项
+    wx.cloud.callFunction({
+      name: 'main',
+      data: {
+        action: 'getOptions',
+        data: {
+          charId: self.data.currentCharId
+        }
+      },
+      success: function(res) {
+        if (res.result && res.result.success && res.result.data && res.result.data.options) {
+          self.setData({
+            showFallbackChoice: true,
+            fallbackOptions: res.result.data.options
+          });
+        } else {
+          // getOptions也失败，给一个简单提示
+          self.setData({ answered: true });
+          self.showFeedback('info', '🔄', '识别暂不可用，请重试');
+          setTimeout(function() { self.nextQuestion(); }, 2000);
+        }
+      },
+      fail: function(err) {
+        console.error('getOptions失败:', err);
+        self.setData({ answered: true });
+        self.showFeedback('info', '🔄', '识别暂不可用，请重试');
+        setTimeout(function() { self.nextQuestion(); }, 2000);
+      }
+    });
+  },
+
+  selectFallbackOption: function(e) {
+    var self = this;
+    if (self.data.answered) return;
+    var selectedId = e.currentTarget.dataset.id;
+    var options = self.data.fallbackOptions;
+    var isCorrect = false;
+
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].id === selectedId && options[i].isCorrect) {
+        isCorrect = true;
+        break;
+      }
+    }
+
+    self.setData({
+      answered: true,
+      showFallbackChoice: false,
+      selectedId: selectedId
+    });
+
+    self.recordReviewResult(self.data.currentCharId, isCorrect, true, null);
+    self.updateCombo(isCorrect);
+
+    if (isCorrect) {
+      self.showFeedback('success', '✅', Delight.getPraise());
+      try { Delight.vibrate('medium'); } catch (e) {}
+    } else {
+      self.showFeedback('error', '❌', '正确答案：' + self.data.currentChar);
+      try { Delight.vibrate('heavy'); } catch (e) {}
+    }
+
+    setTimeout(function() { self.nextQuestion(); }, 2000);
   },
 
   // ========== 下一题 ==========

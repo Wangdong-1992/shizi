@@ -291,6 +291,52 @@ page {
   color: #666;
 }
 
+/* ====== ASR处理中 ====== */
+.asr-processing {
+  text-align: center;
+  padding: 20rpx 0;
+}
+.asr-text {
+  font-size: 28rpx;
+  color: #999;
+}
+
+/* ====== 降级选择题 ====== */
+.choice-mode {
+  margin-top: 30rpx;
+  text-align: center;
+}
+.choice-hint {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 20rpx;
+}
+.choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20rpx;
+}
+.choice-item {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  background: #fff;
+  border: 2rpx solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.08);
+}
+.choice-item:active {
+  transform: scale(0.95);
+  border-color: #4CAF50;
+}
+.choice-char {
+  font-size: 48rpx;
+  color: #333;
+}
+
 /* ==================== 进度点激活动画 ==================== */
 @keyframes starPop {
   0%   { transform: scale(0.3); opacity: 0; }

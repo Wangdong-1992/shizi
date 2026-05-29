@@ -374,7 +374,7 @@ exports.main = async (event, context) => {
       }
 
       case 'recordLearn': {
-        const { openid, charId } = data;
+        const { openid, charId, isAssisted = false } = data;
         const userRes = await db.collection('users').where({ openid }).get();
         if (!userRes.data || userRes.data.length === 0) {
           return { success: false, error: '用户不存在' };
@@ -410,6 +410,7 @@ exports.main = async (event, context) => {
               mastered_chars: masteredChars,
               streak_count: streak,
               last_learn_date: new Date().toISOString().split('T')[0],
+              last_learn_assisted: isAssisted ? new Date().toISOString() : null,
               star_count: _.inc(starInc),
               flower_count: _.inc(flowerInc)
             }
@@ -616,7 +617,7 @@ exports.main = async (event, context) => {
 
       case 'recordReview': {
         // 记录复习结果到review_logs表
-        const { openid, charId, reviewMode, isCorrect } = data;
+        const { openid, charId, reviewMode, isCorrect, isAssisted = false, asrScore = null } = data;
         try {
           await db.collection('review_logs').add({
             data: {
@@ -624,6 +625,9 @@ exports.main = async (event, context) => {
               char_id: charId,
               review_mode: reviewMode === 'listen' ? 1 : 2,
               is_correct: isCorrect,
+              is_assisted: isAssisted,
+              status: isAssisted ? 'pending' : 'confirmed',
+              asr_score: asrScore,
               reviewed_at: new Date()
             }
           });
@@ -664,22 +668,18 @@ exports.main = async (event, context) => {
             };
           } else {
             console.error('ASR 识别失败:', result.err_msg);
-            // 识别失败，返回模拟分数
+            // 识别失败，返回失败标记（不使用Math.random）
             return {
-              success: true,
-              score: Math.random() > 0.3 ? 0.85 : 0.5,
-              recognized: '',
-              isCorrect: Math.random() > 0.3
+              success: false,
+              reason: 'asr_empty'
             };
           }
         } catch (err) {
           console.error('recognizeVoice 错误:', err.message);
-          // 出错时返回模拟结果
+          // 出错时返回失败标记（不使用Math.random）
           return {
-            success: true,
-            score: Math.random() > 0.3 ? 0.85 : 0.5,
-            recognized: '',
-            isCorrect: Math.random() > 0.3
+            success: false,
+            reason: 'exception'
           };
         }
       }

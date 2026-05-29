@@ -24,12 +24,29 @@
     </view>
 
     <!-- 跟读按钮 + 水波纹 -->
-    <view class="record-area">
+    <view class="record-area" wx:if="{{!showChoiceMode && !asrProcessing}}">
       <view wx:if="{{isRecording}}" class="ripple-ring ring-1"></view>
       <view wx:if="{{isRecording}}" class="ripple-ring ring-2"></view>
       <view class="record-btn {{isRecording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
         <text class="record-icon">{{isRecording ? '⏸️' : '🎤'}}</text>
         <text class="record-text">{{isRecording ? '录音中...' : '按住跟读'}}</text>
+      </view>
+    </view>
+
+    <!-- ASR处理中 -->
+    <view wx:if="{{asrProcessing}}" class="asr-processing">
+      <text class="asr-text">🔍 正在识别你的发音...</text>
+    </view>
+
+    <!-- ASR失败降级选择题 -->
+    <view wx:if="{{showChoiceMode}}" class="choice-mode">
+      <view class="choice-hint">🔊 识别暂不可用，请选择正确答案</view>
+      <view class="choice-grid">
+        <view wx:for="{{choiceOptions}}" wx:key="id"
+          class="choice-item"
+          bindtap="selectFallbackOption" data-id="{{item.id}}">
+          <text class="choice-char">{{item.char}}</text>
+        </view>
       </view>
     </view>
 

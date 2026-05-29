@@ -394,7 +394,7 @@ page {
   animation: confettiDrop linear forwards;
 }
 
-/* ====== 空状态 / 加载 ====== */
+/* ==================== 空状态 / 加载 ==================== */
 .empty-state {
   text-align: center;
   padding: 100rpx 48rpx;
@@ -408,6 +408,27 @@ page {
   justify-content: center;
   padding: 100rpx;
   color: #4A90D9;
+}
+
+/* ====== ASR处理中 ====== */
+.asr-processing {
+  text-align: center;
+  padding: 30rpx 0;
+}
+.asr-text {
+  font-size: 30rpx;
+  color: #999;
+}
+
+/* ====== 降级选择题 ====== */
+.fallback-choice {
+  margin-top: 30rpx;
+  text-align: center;
+}
+.fallback-hint {
+  font-size: 28rpx;
+  color: #666;
+  margin-bottom: 20rpx;
 }
 
 /* ============================================== */
