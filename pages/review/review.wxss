@@ -69,6 +69,10 @@ page {
 /* ====== 进度条 ====== */
 .progress-bar {
   margin-bottom: 32rpx;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
 }
 
 .progress-text {
@@ -269,6 +273,96 @@ page {
   font-weight: bold;
 }
 
+/* ====== V2.2: Box等级徽章 ====== */
+.box-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rpx 20rpx;
+  border-radius: 20rpx;
+  margin-left: 16rpx;
+  flex-shrink: 0;
+}
+
+.box-badge-text {
+  font-size: 22rpx;
+  font-weight: bold;
+  color: white;
+}
+
+.box-level-1 { background: linear-gradient(135deg, #A0A0A0, #C0C0C0); }
+.box-level-2 { background: linear-gradient(135deg, #8BC34A, #AED581); }
+.box-level-3 { background: linear-gradient(135deg, #4A90D9, #64B5F6); }
+.box-level-4 { background: linear-gradient(135deg, #7E57C2, #9575CD); }
+.box-level-5 { background: linear-gradient(135deg, #FF6F00, #FFB74D); }
+
+/* ====== V2.2: Box等级变化提示 ====== */
+.box-toast {
+  position: fixed;
+  top: 200rpx;
+  left: 50%;
+  transform: translateX(-50%) translateY(-40rpx);
+  background: linear-gradient(135deg, #4A90D9 0%, #357ABD 100%);
+  color: white;
+  padding: 16rpx 40rpx;
+  border-radius: 32rpx;
+  font-size: 28rpx;
+  font-weight: bold;
+  box-shadow: 0 6rpx 24rpx rgba(74, 144, 217, 0.4);
+  z-index: 200;
+  opacity: 0;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.box-toast.box-toast-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  animation: toastSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.box-toast-text {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: white;
+}
+
+/* ====== V2.2: 状态变化提示 ====== */
+.status-toast {
+  position: fixed;
+  top: 280rpx;
+  left: 50%;
+  transform: translateX(-50%) translateY(-40rpx);
+  background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+  color: white;
+  padding: 16rpx 40rpx;
+  border-radius: 32rpx;
+  font-size: 28rpx;
+  font-weight: bold;
+  box-shadow: 0 6rpx 24rpx rgba(76, 175, 80, 0.4);
+  z-index: 200;
+  opacity: 0;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.status-toast.status-toast-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  animation: toastSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.status-toast-text {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: white;
+}
+
+@keyframes toastSlideIn {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(-40rpx); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 /* ====== 完成庆祝遮罩 ====== */
 .completion-overlay {
   position: fixed;
@@ -288,9 +382,11 @@ page {
   background: white;
   border-radius: 40rpx;
   padding: 64rpx 48rpx 48rpx;
-  width: 580rpx;
+  width: 600rpx;
   text-align: center;
   animation: completionBounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-height: 85vh;
+  overflow-y: auto;
 }
 
 .completion-emoji {
@@ -344,7 +440,69 @@ page {
   font-size: 28rpx;
   color: #999;
   display: block;
-  margin-bottom: 40rpx;
+  margin-bottom: 24rpx;
+}
+
+/* ====== V2.2: Box分布统计 ====== */
+.box-distribution {
+  margin-bottom: 32rpx;
+  padding: 24rpx;
+  background: #f8f9fa;
+  border-radius: 24rpx;
+}
+
+.box-dist-title {
+  font-size: 26rpx;
+  color: #666;
+  display: block;
+  margin-bottom: 16rpx;
+  text-align: center;
+}
+
+.box-dist-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.box-dist-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  opacity: 0.35;
+  transition: all 0.3s;
+}
+
+.box-dist-item.has-change {
+  opacity: 1;
+}
+
+.box-dist-num {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #999;
+}
+
+.box-dist-item.has-change .box-dist-num {
+  color: #4A90D9;
+  animation: numPop 0.4s ease-out;
+}
+
+.box-dist-label {
+  font-size: 20rpx;
+  color: #999;
+}
+
+.box-dist-item.has-change .box-dist-label {
+  color: #4A90D9;
+  font-weight: 600;
+}
+
+@keyframes numPop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .completion-btn {
@@ -372,8 +530,10 @@ page {
 .star-particle {
   position: absolute;
   top: -60rpx;
-  font-size: 36rpx;
+  background: #FFD700;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
   animation: starFall linear forwards;
+  opacity: 0;
 }
 
 /* ====== 彩纸粒子 ====== */
@@ -415,6 +575,7 @@ page {
   text-align: center;
   padding: 30rpx 0;
 }
+
 .asr-text {
   font-size: 30rpx;
   color: #999;
@@ -425,6 +586,7 @@ page {
   margin-top: 30rpx;
   text-align: center;
 }
+
 .fallback-hint {
   font-size: 28rpx;
   color: #666;
@@ -493,15 +655,15 @@ page {
 
 /* 星星下落 */
 @keyframes starFall {
-  0%   { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
-  100% { opacity: 0; transform: translateY(1200rpx) rotate(360deg) scale(0.2); }
+  0%   { transform: scale(0) rotate(0deg); opacity: 1; }
+  50%  { transform: scale(1.5) rotate(180deg); opacity: 0.8; }
+  100% { transform: scale(0) rotate(360deg); opacity: 0; }
 }
 
 /* 彩纸下落 */
 @keyframes confettiDrop {
-  0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
-  85%  { opacity: 1; }
-  100% { opacity: 0; transform: translateY(1200rpx) rotate(720deg); }
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(1200rpx) translateX(var(--wobble, 0rpx)) rotate(720deg); opacity: 0; }
 }
 
 /* 遮罩淡入 */

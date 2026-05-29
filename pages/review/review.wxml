@@ -19,6 +19,10 @@
     <view class="progress-track">
       <view class="progress-fill" style="width: {{progressPercent}}%"></view>
     </view>
+    <!-- V2.2: Box等级徽章 -->
+    <view class="box-badge box-level-{{currentProgress.box_level || 1}}" wx:if="{{currentProgress}}">
+      <text class="box-badge-text">Box {{currentProgress.box_level || 1}}</text>
+    </view>
   </view>
 
   <!-- 题目区域 - 听音选字模式 -->
@@ -54,7 +58,7 @@
   <view wx:if="{{mode === 'speak' && currentChar}}" class="question-speak card-entrance">
     <view class="char-display">{{currentChar}}</view>
 
-    <button wx:if="{{!asrProcessing && !showFallbackChoice}}" class="record-btn {{recording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
+    <button wx:if="{{!asrProcessing && !showFallbackChoice && !answered}}" class="record-btn {{recording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
       <text class="record-icon">{{recording ? '⏸️' : '🎤'}}</text>
       <text class="record-text">{{recording ? '录音中...' : '按住说出发音'}}</text>
     </button>
@@ -85,15 +89,24 @@
     </view>
   </view>
 
+  <!-- V2.2: Box等级变化提示 -->
+  <view class="box-toast {{showBoxToast ? 'box-toast-show' : ''}}" wx:if="{{showBoxToast}}">
+    <text class="box-toast-text">{{boxChangeToast}}</text>
+  </view>
+
+  <!-- V2.2: 状态变化提示 -->
+  <view class="status-toast {{showStatusToast ? 'status-toast-show' : ''}}" wx:if="{{showStatusToast}}">
+    <text class="status-toast-text">{{statusChangeToast}}</text>
+  </view>
+
   <!-- 粒子层 -->
   <view class="particle-layer" wx:if="{{showStars}}">
-    <view wx:for="{{starParticles}}" wx:key="id" class="star-particle" style="left: {{item.x}}%; animation-delay: {{item.delay}}s; animation-duration: {{item.duration}}s;">
-      ⭐
+    <view wx:for="{{stars}}" wx:key="id" class="star-particle" style="left:{{item.x}}%;top:{{item.y}}%;width:{{item.size}}rpx;height:{{item.size}}rpx;animation-delay:{{item.delay}}s;transform:rotate({{item.rotate}}deg);">
     </view>
   </view>
 
   <view class="confetti-layer" wx:if="{{showConfetti}}">
-    <view wx:for="{{confettiPieces}}" wx:key="id" class="confetti-piece" style="left: {{item.x}}%; background: {{item.color}}; animation-delay: {{item.delay}}s; animation-duration: {{item.duration}}s; width: {{item.size}}rpx; height: {{item.size}}rpx;">
+    <view wx:for="{{confetti}}" wx:key="id" class="confetti-piece" style="left:{{item.x}}%;background:{{item.color}};width:{{item.size}}rpx;height:{{item.size}}rpx;animation-delay:{{item.delay}}s;animation-duration:{{item.duration}}s;--wobble:{{item.wobble}}rpx;">
     </view>
   </view>
 
@@ -119,6 +132,34 @@
         </view>
       </view>
       <text class="completion-rate">{{completionData.rate}}% 正确率</text>
+
+      <!-- V2.2: Box分布统计 -->
+      <view class="box-distribution" wx:if="{{boxDistribution.box1 + boxDistribution.box2 + boxDistribution.box3 + boxDistribution.box4 + boxDistribution.box5 > 0}}">
+        <text class="box-dist-title">本轮Box变化</text>
+        <view class="box-dist-row">
+          <view class="box-dist-item {{boxDistribution.box1 > 0 ? 'has-change' : ''}}">
+            <text class="box-dist-num">{{boxDistribution.box1}}</text>
+            <text class="box-dist-label">Box1</text>
+          </view>
+          <view class="box-dist-item {{boxDistribution.box2 > 0 ? 'has-change' : ''}}">
+            <text class="box-dist-num">{{boxDistribution.box2}}</text>
+            <text class="box-dist-label">Box2</text>
+          </view>
+          <view class="box-dist-item {{boxDistribution.box3 > 0 ? 'has-change' : ''}}">
+            <text class="box-dist-num">{{boxDistribution.box3}}</text>
+            <text class="box-dist-label">Box3</text>
+          </view>
+          <view class="box-dist-item {{boxDistribution.box4 > 0 ? 'has-change' : ''}}">
+            <text class="box-dist-num">{{boxDistribution.box4}}</text>
+            <text class="box-dist-label">Box4</text>
+          </view>
+          <view class="box-dist-item {{boxDistribution.box5 > 0 ? 'has-change' : ''}}">
+            <text class="box-dist-num">{{boxDistribution.box5}}</text>
+            <text class="box-dist-label">Box5</text>
+          </view>
+        </view>
+      </view>
+
       <button class="completion-btn" bindtap="restartReview">再来一次</button>
     </view>
   </view>

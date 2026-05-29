@@ -4,6 +4,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "canvas": "^3.2.3"
+    "canvas": "^3.2.3",
+    "hanzi-writer-data": "^2.0.1"
   }
 }

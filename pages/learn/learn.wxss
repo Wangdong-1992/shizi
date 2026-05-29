@@ -4,7 +4,7 @@ page {
 }
 
 .container {
-  padding: 48rpx;
+  padding: 32rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -24,27 +24,111 @@ page {
   position: relative;
 }
 
-/* ==================== 进度指示器 ==================== */
-.progress-indicator {
+/* ==================== 步骤进度条 ==================== */
+.step-progress {
   display: flex;
-  gap: 20rpx;
-  margin-bottom: 48rpx;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 40rpx;
+  padding: 0 16rpx;
+  width: 100%;
 }
 
-.dot {
-  width: 28rpx;
-  height: 28rpx;
-  border-radius: 50%;
-  background: #ddd;
+.step-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  opacity: 0.4;
   transition: all 0.3s;
 }
 
-.dot.active {
-  background: #4CAF50;
-  animation: starPop 0.4s ease-out;
+.step-dot.active {
+  opacity: 1;
 }
 
-/* ==================== 汉字卡片 ==================== */
+.step-dot.completed .step-num {
+  background: #4CAF50;
+  color: white;
+  animation: stepPop 0.4s ease-out;
+}
+
+.step-num {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #ddd;
+  color: #666;
+  font-size: 24rpx;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.step-dot.active .step-num {
+  background: #4A90D9;
+  color: white;
+}
+
+.step-label {
+  font-size: 20rpx;
+  color: #999;
+}
+
+.step-dot.active .step-label {
+  color: #4A90D9;
+  font-weight: 600;
+}
+
+.step-dot.completed .step-label {
+  color: #4CAF50;
+}
+
+.step-line {
+  flex: 1;
+  height: 4rpx;
+  background: #e0e0e0;
+  margin: 0 8rpx;
+  margin-bottom: 24rpx;
+  transition: background 0.3s;
+}
+
+.step-line.active {
+  background: #4A90D9;
+}
+
+@keyframes stepPop {
+  0%   { transform: scale(0.3); opacity: 0; }
+  60%  { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ==================== 步骤内容通用 ==================== */
+.step-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.step-content.bounce-in {
+  animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes bounceIn {
+  0%   { transform: scale(0.3) translateY(40rpx); opacity: 0; }
+  50%  { transform: scale(1.05) translateY(-10rpx); opacity: 1; }
+  70%  { transform: scale(0.95) translateY(5rpx); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ==================== Step1: 释义 ==================== */
+.step1-content {
+  padding-top: 16rpx;
+}
+
 .char-card {
   background: white;
   border-radius: 40rpx;
@@ -67,21 +151,10 @@ page {
   color: #4A90D9;
   margin-top: 24rpx;
   font-weight: 500;
+  display: block;
 }
 
-/* -- 卡片入场动画 -- */
-.char-card.bounce-in {
-  animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes bounceIn {
-  0%   { transform: scale(0.3); opacity: 0; }
-  50%  { transform: scale(1.05); opacity: 1; }
-  70%  { transform: scale(0.95); }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-/* -- 卡片抖动动画 -- */
+/* 卡片抖动动画 */
 .char-card.shaking {
   animation: cardShake 0.5s ease-out;
 }
@@ -95,11 +168,10 @@ page {
   90%      { transform: translateX(-4rpx); }
 }
 
-/* ==================== 按钮 ==================== */
 .btn-row {
   display: flex;
   gap: 40rpx;
-  margin-bottom: 60rpx;
+  margin-bottom: 48rpx;
 }
 
 .btn {
@@ -119,9 +191,271 @@ page {
   box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
 }
 
+.step1-action {
+  margin-top: 32rpx;
+}
+
+.step-complete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: linear-gradient(135deg, #4CAF50, #66BB6A);
+  color: white;
+  padding: 28rpx 80rpx;
+  border-radius: 60rpx;
+  box-shadow: 0 8rpx 32rpx rgba(76, 175, 80, 0.4);
+  transition: transform 0.15s;
+}
+
+.step-complete-btn:active {
+  transform: scale(0.95);
+}
+
+.step-complete-icon {
+  font-size: 40rpx;
+}
+
+.step-complete-text {
+  font-size: 32rpx;
+  font-weight: bold;
+}
+
+/* ==================== Step2: 再认 ==================== */
+.step2-content {
+  padding-top: 24rpx;
+}
+
+.step2-hint {
+  font-size: 30rpx;
+  color: #666;
+  margin-bottom: 40rpx;
+  text-align: center;
+}
+
+.step2-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: linear-gradient(135deg, #4A90D9, #7AB3ED);
+  color: white;
+  padding: 24rpx 56rpx;
+  border-radius: 48rpx;
+  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+  margin-bottom: 48rpx;
+  transition: transform 0.15s;
+}
+
+.step2-play:active {
+  transform: scale(0.95);
+}
+
+.step2-play-icon {
+  font-size: 48rpx;
+}
+
+.step2-play-text {
+  font-size: 30rpx;
+  font-weight: bold;
+}
+
+.step2-options {
+  display: flex;
+  justify-content: center;
+  gap: 32rpx;
+  width: 100%;
+}
+
+.step2-option {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 24rpx;
+  background: white;
+  border: 4rpx solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+  transition: all 0.3s;
+}
+
+.step2-option:active {
+  transform: scale(0.95);
+}
+
+.step2-option-char {
+  font-size: 88rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+/* 正确弹跳 */
+.step2-option.correct-pop {
+  background: rgba(76, 175, 80, 0.15);
+  border-color: #4CAF50;
+  animation: optionBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 错误抖动 */
+.step2-option.wrong-shake {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: #f44336;
+  animation: optionShake 0.5s ease;
+}
+
+/* 未选中变暗 */
+.step2-option.dim {
+  opacity: 0.4;
+}
+
+.step2-loading {
+  padding: 60rpx;
+  text-align: center;
+  color: #999;
+  font-size: 28rpx;
+}
+
+@keyframes optionBounce {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.08); }
+  70%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+@keyframes optionShake {
+  0%, 100% { transform: translateX(0); }
+  15%      { transform: translateX(-12rpx); }
+  30%      { transform: translateX(12rpx); }
+  45%      { transform: translateX(-10rpx); }
+  60%      { transform: translateX(10rpx); }
+  75%      { transform: translateX(-6rpx); }
+  90%      { transform: translateX(6rpx); }
+}
+
+/* ==================== Step3: 描红 ==================== */
+.step3-content {
+  padding-top: 24rpx;
+}
+
+.step3-hint {
+  font-size: 30rpx;
+  color: #666;
+  margin-bottom: 32rpx;
+  text-align: center;
+}
+
+.stroke-area {
+  width: 400rpx;
+  height: 400rpx;
+  border-radius: 24rpx;
+  background: white;
+  border: 4rpx dashed #ddd;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+  margin-bottom: 32rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+.stroke-canvas {
+  width: 400rpx;
+  height: 400rpx;
+}
+
+.stroke-char-display {
+  font-size: 280rpx;
+  font-weight: bold;
+  color: rgba(0, 0, 0, 0.12);
+  line-height: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.stroke-progress {
+  position: absolute;
+  bottom: 16rpx;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 20rpx;
+  padding: 6rpx 24rpx;
+}
+
+.stroke-progress-text {
+  color: white;
+  font-size: 24rpx;
+}
+
+.stroke-area-nodata {
+  background: #f8f8f8;
+}
+
+.stroke-nodata-text {
+  font-size: 28rpx;
+  color: #bbb;
+  margin-top: 16rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.stroke-guide-text {
+  font-size: 24rpx;
+  color: #4A90D9;
+  position: absolute;
+  bottom: 20rpx;
+}
+
+.step3-skip {
+  padding: 20rpx 48rpx;
+  border-radius: 32rpx;
+  background: #f5f5f5;
+  color: #999;
+  font-size: 28rpx;
+  transition: all 0.15s;
+}
+
+.step3-skip:active {
+  background: #eee;
+  color: #666;
+}
+
+/* ==================== Step4: 跟读 ==================== */
+.step4-content {
+  padding-top: 16rpx;
+}
+
+.step4-char-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 48rpx;
+}
+
+.step4-char {
+  font-size: 200rpx;
+  font-weight: bold;
+  color: #333;
+  line-height: 1.2;
+}
+
+.step4-char.shaking {
+  animation: cardShake 0.5s ease-out;
+}
+
+.step4-pinyin {
+  font-size: 48rpx;
+  color: #4A90D9;
+  margin-top: 16rpx;
+  font-weight: 500;
+}
+
 /* ==================== 录音区域 + 水波纹 ==================== */
 .record-area {
-  margin-top: 40rpx;
+  margin-top: 24rpx;
   position: relative;
   display: flex;
   align-items: center;
@@ -189,9 +523,61 @@ page {
   100% { transform: scale(1.6); opacity: 0; }
 }
 
+/* ==================== ASR处理中 ==================== */
+.asr-processing {
+  text-align: center;
+  padding: 20rpx 0;
+}
+
+.asr-text {
+  font-size: 28rpx;
+  color: #999;
+}
+
+/* ==================== 降级选择题 ==================== */
+.choice-mode {
+  margin-top: 30rpx;
+  text-align: center;
+}
+
+.choice-hint {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 20rpx;
+}
+
+.choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20rpx;
+}
+
+.choice-item {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  background: #fff;
+  border: 2rpx solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.08);
+}
+
+.choice-item:active {
+  transform: scale(0.95);
+  border-color: #4CAF50;
+}
+
+.choice-char {
+  font-size: 48rpx;
+  color: #333;
+}
+
 /* ==================== 反馈卡片 ==================== */
 .feedback-card {
-  margin-top: 48rpx;
+  margin-top: 32rpx;
   padding: 28rpx 56rpx;
   border-radius: 48rpx;
   display: flex;
@@ -228,6 +614,61 @@ page {
   font-size: 30rpx;
   color: #333;
   font-weight: 500;
+}
+
+/* ==================== 学习完成庆祝 ==================== */
+.learn-complete-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  animation: overlayFadeIn 0.3s ease;
+}
+
+.learn-complete-card {
+  background: white;
+  border-radius: 40rpx;
+  padding: 64rpx 80rpx;
+  text-align: center;
+  animation: completionBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.learn-complete-emoji {
+  font-size: 96rpx;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.learn-complete-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #4CAF50;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.learn-complete-char {
+  font-size: 120rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes completionBounce {
+  0%   { opacity: 0; transform: scale(0.5) translateY(100rpx); }
+  70%  { opacity: 1; transform: scale(1.03) translateY(-10rpx); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 /* ==================== 星星粒子 ==================== */
@@ -274,7 +715,13 @@ page {
   100% { transform: translateY(110vh) translateX(var(--wobble)) rotate(720deg); opacity: 0; }
 }
 
-/* ==================== 旧提示（保留兼容） ==================== */
+/* ==================== 空状态 ==================== */
+.empty {
+  padding: 100rpx;
+  text-align: center;
+  color: #666;
+}
+
 .tip-message {
   margin-top: 40rpx;
   padding: 24rpx 48rpx;
@@ -283,63 +730,4 @@ page {
   font-size: 32rpx;
   color: #333;
   box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.1);
-}
-
-.empty {
-  padding: 100rpx;
-  text-align: center;
-  color: #666;
-}
-
-/* ====== ASR处理中 ====== */
-.asr-processing {
-  text-align: center;
-  padding: 20rpx 0;
-}
-.asr-text {
-  font-size: 28rpx;
-  color: #999;
-}
-
-/* ====== 降级选择题 ====== */
-.choice-mode {
-  margin-top: 30rpx;
-  text-align: center;
-}
-.choice-hint {
-  font-size: 26rpx;
-  color: #666;
-  margin-bottom: 20rpx;
-}
-.choice-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20rpx;
-}
-.choice-item {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 16rpx;
-  background: #fff;
-  border: 2rpx solid #e0e0e0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.08);
-}
-.choice-item:active {
-  transform: scale(0.95);
-  border-color: #4CAF50;
-}
-.choice-char {
-  font-size: 48rpx;
-  color: #333;
-}
-
-/* ==================== 进度点激活动画 ==================== */
-@keyframes starPop {
-  0%   { transform: scale(0.3); opacity: 0; }
-  60%  { transform: scale(1.4); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
 }
