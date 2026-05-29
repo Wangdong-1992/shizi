@@ -54,10 +54,27 @@
   <view wx:if="{{mode === 'speak' && currentChar}}" class="question-speak card-entrance">
     <view class="char-display">{{currentChar}}</view>
 
-    <button class="record-btn {{recording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
+    <button wx:if="{{!asrProcessing && !showFallbackChoice}}" class="record-btn {{recording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
       <text class="record-icon">{{recording ? '⏸️' : '🎤'}}</text>
       <text class="record-text">{{recording ? '录音中...' : '按住说出发音'}}</text>
     </button>
+
+    <!-- ASR处理中 -->
+    <view wx:if="{{asrProcessing}}" class="asr-processing">
+      <text class="asr-text">🔍 正在识别...</text>
+    </view>
+
+    <!-- ASR失败降级选择题 -->
+    <view wx:if="{{showFallbackChoice}}" class="fallback-choice">
+      <view class="fallback-hint">🔊 语音识别暂不可用，请选择正确答案</view>
+      <view class="options-grid">
+        <view wx:for="{{fallbackOptions}}" wx:key="id"
+          class="option-item {{selectedId === item.id ? 'selected' : ''}} {{answered ? (item.isCorrect ? 'correct-pop' : (selectedId === item.id ? 'wrong-shake' : '')) : ''}}"
+          bindtap="selectFallbackOption" data-id="{{item.id}}">
+          <text class="option-char">{{item.char}}</text>
+        </view>
+      </view>
+    </view>
 
     <!-- 反馈卡片 -->
     <view class="feedback-row" wx:if="{{answered}}">

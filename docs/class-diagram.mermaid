@@ -1,0 +1,60 @@
+classDiagram
+    class ReviewPage {
+        +data: Object
+        +processRecording(filePath: String) void
+        +handleAsrSuccess(score: Number, transcript: String) void
+        +handleAsrFailure(reason: String) void
+        +loadFallbackOptions() void
+        +selectFallbackOption(e: Object) void
+        +selectOption(e: Object) void
+        +recordReviewResult(charId: String, isCorrect: Boolean, isAssisted: Boolean) void
+        +updateCombo(isCorrect: Boolean) void
+        +showFeedback(type: String, icon: String, msg: String) void
+        +startRecord() void
+        +stopRecord() void
+    }
+
+    class LearnPage {
+        +data: Object
+        +processRecording(filePath: String) void
+        +handleAsrSuccess(score: Number, transcript: String) void
+        +handleAsrFailure(reason: String) void
+        +loadFallbackOptions() void
+        +selectFallbackOption(e: Object) void
+        +processRecognizeResult(result: Object) void
+        +recordMastered(isAssisted: Boolean) void
+        +startRecord() void
+        +stopRecord() void
+    }
+
+    class CloudFunctionMain {
+        +recognizeVoice(fileID: String, targetPinyin: String) Object
+        +recordReview(data: Object) Object
+        +recordLearn(data: Object) Object
+        +getOptions(charId: String) Object
+    }
+
+    class ReviewLogRecord {
+        +openid: String
+        +char_id: String
+        +review_mode: Number
+        +is_correct: Boolean
+        +is_assisted: Boolean
+        +status: String
+        +asr_score: Number
+        +reviewed_at: Date
+    }
+
+    class LearningProgressRecord {
+        +openid: String
+        +char_id: String
+        +is_assisted: Boolean
+        +status: String
+        +correct_count: Number
+        +wrong_review_count: Number
+    }
+
+    ReviewPage --> CloudFunctionMain : 调用
+    LearnPage --> CloudFunctionMain : 调用
+    CloudFunctionMain --> ReviewLogRecord : 写入review_logs
+    CloudFunctionMain --> LearningProgressRecord : 写入learning_progress

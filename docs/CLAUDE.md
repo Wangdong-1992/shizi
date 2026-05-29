@@ -6,34 +6,37 @@
 
 **技术栈：**
 - 微信小程序云开发（云函数 + 云数据库）
-- 前端：原生 WXML/WXSS/JS
-- 语音：微信同声传译（简化版，发音为模拟实现）
+- 前端：原生 WXML/WXSS/JS（ES5兼容语法）
+- 语音：百度语音识别 API（TTS + ASR）
+- 云环境：`cloud1-d7geippqn581097e3`
+- AppID：`wxa2bbfca6b9ef6ebd`
 
 ## 项目结构
 
 ```
 E:/claude/PMRD/shizi/
-├── docs/                    # 产品文档目录
-│   ├── 儿童识字应用_PRD_V1.1.0.md  # 产品需求文档
-│   ├── # 儿童识字应用 产品需求文档（PRD）.txt
-│   ├── 一级字表_拼音.xlsx       # 2256字原始数据
-│   └── CLAUDE.md              # 本文件
-├── pages/                    # 页面目录
-│   ├── index/                # 首页
-│   ├── learn/                # 学习页
-│   ├── review/               # 复习页
-│   ├── profile/              # 个人中心
-│   ├── mastered/             # 已掌握汉字列表
-│   └── settings/             # 设置页（V1.3.0）
-├── cloudfunctions/           # 云函数
-│   ├── login/                # 获取openid
-│   ├── main/                 # 主业务逻辑（13个action：wxLogin/getUser/getStats/getNextChar/recordLearn/getPendingReview/getAchievements/getOptions/recordReview/recognizeVoice/getAudio/getMasteredChars/updateUserInfo/getPhoneNumber）
-│   ├── fixData/              # 数据修复
-│   └── import_chardata/      # 汉字数据导入
-├── images/                   # TabBar图标
-├── app.js                    # 应用入口
-├── app.json                  # 全局配置
-└── app.wxss                  # 全局样式
+├── docs/                              # 产品文档
+│   ├── 儿童识字应用_PRD_V1.1.0.md      # 产品需求文档
+│   ├── 一级字表_拼音.xlsx              # 2256字原始数据
+│   └── CLAUDE.md                      # 本文件（项目约定）
+├── pages/                             # 页面目录
+│   ├── index/                         # 首页
+│   ├── learn/                         # 学习页
+│   ├── review/                        # 复习页
+│   ├── profile/                       # 个人中心
+│   ├── mastered/                      # 已掌握汉字列表
+│   └── settings/                      # 设置页
+├── utils/
+│   └── delight.js                     # V2.0 愉悦体验引擎
+├── cloudfunctions/                    # 云函数
+│   ├── login/                         # 获取openid
+│   ├── main/                          # 主业务逻辑（14个action）
+│   ├── fixData/                       # 数据修复
+│   └── import_chardata/               # 汉字数据导入
+├── images/                            # TabBar图标
+├── app.js                             # 应用入口
+├── app.json                           # 全局配置
+└── app.wxss                           # 全局样式
 ```
 
 ## 云数据库集合
@@ -49,7 +52,7 @@ E:/claude/PMRD/shizi/
 
 **characters 集合结构：**
 ```json
-{ "id": 1, "char": "一", "pinyin": "yī" }
+{ "_id": "xxx", "id": 1, "char": "一", "pinyin": "yī" }
 ```
 
 **users 集合结构：**
@@ -91,120 +94,106 @@ E:/claude/PMRD/shizi/
 
 ## 云函数接口 (main)
 
-| action | 说明 |
-|--------|------|
-| wxLogin | 微信登录（code换openid + 生成token） |
-| getUser | 获取用户信息 |
-| getStats | 获取用户统计 |
-| getNextChar | 获取下一个待学汉字 |
-| recordLearn | 记录学习完成（含奖励发放） |
-| getPendingReview | 获取待复习列表 |
-| getAchievements | 获取成就列表 |
-| getOptions | 获取听音选字选项 |
-| recordReview | 记录复习结果 |
-| recognizeVoice | 百度语音识别 |
-| getAudio | 百度TTS发音 |
-| getMasteredChars | 获取已掌握汉字列表 |
+| action | 说明 | 参数 |
+|--------|------|------|
+| wxLogin | 微信登录（code换openid + 生成token） | { code, nickname, avatarUrl } |
+| getUser | 获取用户信息 | { openid } |
+| getStats | 获取用户统计（与getMasteredChars使用相同交叉比对逻辑） | { openid } |
+| getNextChar | 获取下一个待学汉字 | { openid } |
+| recordLearn | 记录学习完成（含奖励发放） | { openid, charId } |
+| getPendingReview | 获取待复习列表 | { openid, limit } |
+| getAchievements | 获取成就列表 | { openid } |
+| getOptions | 获取听音选字选项 | { charId } |
+| recordReview | 记录复习结果 | { openid, charId, reviewMode, isCorrect } |
+| recognizeVoice | 百度语音识别 | { fileID, targetPinyin } |
+| getAudio | 百度TTS发音 | { char, pinyin } |
+| updateUserInfo | 更新用户信息（头像/昵称） | { openid, nickname, avatarUrl } |
+| getPhoneNumber | 微信手机号解密 | { code } |
+| getMasteredChars | 获取已掌握汉字列表（交叉比对characters表） | { openid } |
+
+## V2.0 愉悦体验引擎 (utils/delight.js)
+
+| API | 说明 |
+|-----|------|
+| `vibrate(type)` | 触感反馈（light/medium/heavy） |
+| `shake(page, key)` | 元素抖动效果 |
+| `countUp(page, key, target)` | 单数字滚动动画 |
+| `countUpBatch(page, items)` | 批量数字滚动（items: [{key, value}]） |
+| `burstStars(page)` | 星星粒子特效 |
+| `burstConfetti(page)` | 烟花庆祝特效 |
+| `getComboLevel(n)` | 连击等级（3连🔥 / 5连🔥🔥 / 7连🔥🔥🔥） |
+| `getRandomPraise()` | 随机鼓励语 |
+| `getRandomEncourage()` | 随机温和鼓励 |
+| `playSound(type)` | 音效振动（success/wrong） |
+
+**页面动画清单：**
+- 首页：entranceSlideUp（分区入场）+ badgePulse（成就脉冲）+ 数字滚动
+- 学习页：cardBounceIn（卡片弹性）+ rippleExpand（录音波纹）+ starFloat（星星粒子）+ confettiFall（烟花）+ feedbackPopIn（反馈弹窗）
+- 复习页：comboPopIn（连击徽章）+ superComboGlow（超级发光）+ correctPop/wrongShake（选项反馈）
 
 ## 已完成功能
 
 - [x] 云函数部署（login, main）
 - [x] 云数据库集合创建（users, characters, achievement_log, reward_logs, review_logs, learning_progress）
 - [x] 汉字数据导入（2256字）
-- [x] TabBar图标
-- [x] 学习页汉字展示
-- [x] 跳过按钮（已移除）
-- [x] AI配图（已移除）
-- [x] 成就奖励计算修复
+- [x] TabBar图标 + 首页/学习页/复习页/个人中心
+- [x] 语音发音（百度TTS，getAudio）
+- [x] 跟读识别（百度ASR，recognizeVoice）
+- [x] 复习页完整功能（听音选字、看字说音）
 - [x] 已掌握汉字列表页（mastered）
-- [x] 设置页（settings）- 含关于我们、退出登录
+- [x] 设置页（settings）- 关于我们、退出登录
+- [x] 成就奖励计算修复
 - [x] 登录页UI改版（微信绿色按钮+隐私协议）
 - [x] wxLogin云函数（token生成，7天有效期）
 - [x] 微信昵称和头像授权登录（V1.4.0）
-- [x] 严选风格登录页改造（V1.5.0）：全屏渐变背景+漂浮汉字+底部白色卡片+绑定 getUserInfo
-- [x] 登录授权修复（V1.5.1）：废弃 getUserInfo → chooseAvatar + nickname input + 头像云存储上传
-- [x] 手机号授权登录 + 设置页头像昵称修改（V1.6.0）：getPhoneNumber 云函数解密 + 默认头像昵称 + 设置页支持相册/微信头像 + 微信/自定义昵称(1-10字)
+- [x] 严选风格登录页改造（V1.5.0）：全屏渐变+漂浮汉字+底部卡片
+- [x] 登录授权修复（V1.5.1）：废弃getUserInfo → chooseAvatar + nickname input + 头像云存储上传
+- [x] 手机号授权登录 + 设置页头像昵称修改（V1.6.0）：getPhoneNumber + 默认头像昵称 + 设置页可修改
+- [x] 愉悦体验全面升级（V2.0.0）：utils/delight.js + 三页面动画改造 + 14组关键帧动画
 
-## 待完成功能
+## 已修复Bug
 
-- [x] 语音发音（百度TTS，已接入getAudio）
-- [x] 跟读识别功能（百度ASR，已接入recognizeVoice）
-- [x] 复习页完整功能（听音选字、看字说音）
-- [x] 个人中心数据展示
+### mastered_chars 计数不一致（首页与列表页数量不同）
 
-## 已知Bug
+**现象**：
+- `getStats` 数数组 = 7，`getMasteredChars` 交叉比对 = 6（悬空ID）
+- 后 `getStats` 改纯去重 → 首页变7、列表仍是6（不一致）
+- 又现 `countUpBatch` 参数名 bug → 首页始终显示0
 
-### 已掌握汉字列表数量与首页显示不一致
+**最终修复方案（2026-05-28）**：
+1. **云函数** `getStats` 改用与 `getMasteredChars` 完全一致的算法：去重 → 查 characters 表 `id`/`_id` 双向匹配 → 再去重 → 计数
+2. **前端** `utils/delight.js:103` `countUpBatch` 参数名修复：`item.target` → `item.value || item.target`
 
-**现象**：首页显示已掌握2个，列表只显示1个
+### profile 头像 cloud:// 路径乱码
 
-**原因**：`mastered_chars` 数组中同一个字被存了两次（id和_id都存了），导致：
-- `getStats` 返回的 `mastered_chars.length` 是2
-- `getMasteredChars` 过滤后去重只剩1个
+**修复**：profile.js 检测 `cloud://` → `wx.cloud.getTempFileURL()` 转临时 HTTPS 链接 → WXML 条件渲染
 
-**根因**：
-1. `characters` 集合中每条记录有 `id`（数字）和 `_id`（MongoDB字符串）两个字段
-2. `recordLearn` 存入 `mastered_chars` 时，charId可能是数字id也可能是字符串_id
-3. `getMasteredChars` 过滤时用了字符串比较，但去重逻辑有问题
+## 开发约定
 
-**修复方向**：
-1. `recordLearn` 入库前统一转字符串再检查是否已存在
-2. `getMasteredChars` 去重时用 Set 按字符串 id 去重
-3. 或清理数据库中 `mastered_chars` 的重复数据
-
-**相关代码**：
-- `cloudfunctions/main/index.js` - `recordLearn` case
-- `cloudfunctions/main/index.js` - `getMasteredChars` case
+1. **ES5 语法**：对象回调用 `key: function(){}` 不用 `key(){}`，`var self = this` 模式，避免 `.bind()` 链式调用
+2. **openid 识别用户**：微信云开发通过 openid 标识用户
+3. **云函数统一入口**：main 云函数处理所有业务逻辑（14个action），login 独立处理 openid 获取
+4. **奖励后端控制**：云函数返回奖励结果，前端展示
+5. **数据去重**：成就解锁使用幂等检查
+6. **集合命名**：成就记录集合名为 `achievement_log`（无s）
+7. **跨比对一致性**：首页统计和列表页统计使用相同的交叉比对逻辑
 
 ## 部署步骤
 
 1. 微信开发者工具导入项目，目录选择 `E:\claude\PMRD\shizi`，appid: `wxa2bbfca6b9ef6ebd`
 2. 开通云开发环境（环境ID: `cloud1-d7geippqn581097e3`）
-3. 上传云函数：
-   ```bash
-   cd /e/claude/PMRD/shizi
-   npx tcb fn deploy login --dir cloudfunctions/login -e cloud1-d7geippqn581097e3
-   npx tcb fn deploy main --dir cloudfunctions/main -e cloud1-d7geippqn581097e3
-   ```
+3. 上传云函数：右键 `cloudfunctions/main` 目录 →「上传并部署：云端安装依赖」
 4. 预览测试
 
-## 文档管理规范
-
-**核心原则：文档双写机制**
-- 主文档目录：`E:\claude\PMRD\shizi\docs\`
-- 备份文档目录：`E:\claude\PMRD\shizi-docs\`
-- **任何文档更新必须同时操作两个目录，保持完全一致**
-
-**双写范围：**
-- PRD文档（`.md` 和 `.txt`）
-- 配置文件（`CLAUDE.md`）
-- 数据文件（`.xlsx`）
-
-**操作流程：**
-1. 先在 `docs/` 更新文档
-2. 同步复制到 `shizi-docs/` 目录
-3. 两个目录的同名文件内容必须完全一致
-
-**验证方式：**
-更新后检查两个目录的文件修改时间是否一致
-
-## 登录流程 (V1.4.0)
+## 登录流程
 
 1. 用户打开小程序 → 显示登录卡片（tabbar隐藏）
 2. 用户勾选隐私协议 → 显示头像选择器和昵称输入框
 3. 点击头像按钮 → 微信弹出头像选择器（`open-type="chooseAvatar"`）
 4. 昵称输入框（`type="nickname"`）支持微信自动填充
-5. 点击"微信一键登录" → `wx.login()` 获取 code
+5. 点击「微信一键登录」→ `wx.login()` 获取 code
 6. 上传头像到云存储（`wx.cloud.uploadFile`）
 7. 调用 `main/wxLogin` 云函数完成登录
 8. 云函数通过 `code2openid` 获取 openid，生成 token（7天有效期）
 9. 用户信息（nickname, avatar_url）存入 `users` 集合
 10. 首页和个人中心显示真实昵称和头像
-
-## 开发约定
-
-1. **openid识别用户**：微信云开发通过openid标识用户
-2. **云函数统一入口**：main云函数处理所有业务逻辑
-3. **奖励后端控制**：云函数返回奖励结果，前端展示
-4. **数据去重**：成就解锁使用幂等检查
-5. **集合命名**：成就记录集合名为 `achievement_log`（无s），注意与其他集合区分

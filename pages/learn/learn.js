@@ -26,7 +26,13 @@ Page({
     showStars: false,
     stars: [],
     showConfetti: false,
-    confetti: []
+    confetti: [],
+
+    // ASR降级相关
+    showChoiceMode: false,
+    choiceOptions: [],
+    asrFailed: false,
+    asrProcessing: false
   },
 
   // ==================== 生命周期 ====================
@@ -93,7 +99,9 @@ Page({
         pinyin: masteredChar.pinyin,
         fromMastered: true,
         loading: false,
-        correctCount: 0
+        correctCount: 0,
+        asrFailed: false,
+        showChoiceMode: false
       });
       this.triggerEntrance();
       setTimeout(this.playAudio.bind(this), 500);
@@ -126,7 +134,9 @@ Page({
       loading: true,
       correctCount: 0,
       feedbackShow: false,
-      cardEntrance: false
+      cardEntrance: false,
+      asrFailed: false,
+      showChoiceMode: false
     });
 
     wx.cloud.callFunction({
@@ -246,6 +256,7 @@ Page({
   processRecording: function(filePath) {
     var self = this;
     console.log('processRecording 被调用, 文件:', filePath);
+    self.setData({ asrProcessing: true });
     self.showFeedback('info', '🔍', '正在听你读...');
 
     wx.cloud.uploadFile({
@@ -267,25 +278,81 @@ Page({
           success: function(res) {
             console.log('识别结果:', JSON.stringify(res.result));
             if (res.result && res.result.success) {
+              self.setData({ asrProcessing: false });
               self.processRecognizeResult({
                 score: res.result.score,
                 transcript: res.result.recognized
               });
             } else {
-              self.processRecognizeResult({ score: Math.random() > 0.3 ? 0.85 : 0.5 });
+              self.handleAsrFailure('asr_empty');
             }
           },
           fail: function(err) {
             console.error('识别请求失败:', err);
-            self.processRecognizeResult({ score: Math.random() > 0.3 ? 0.85 : 0.5 });
+            self.handleAsrFailure('network_failed');
           }
         });
       },
       fail: function(err) {
         console.error('上传失败:', err);
-        self.processRecognizeResult({ score: Math.random() > 0.3 ? 0.85 : 0.5 });
+        self.handleAsrFailure('upload_failed');
       }
     });
+  },
+
+  handleAsrFailure: function(reason) {
+    var self = this;
+    console.log('学习ASR失败，降级为选择题, 原因:', reason);
+    self.setData({ asrProcessing: false });
+
+    wx.cloud.callFunction({
+      name: 'main',
+      data: {
+        action: 'getOptions',
+        data: {
+          charId: self.data.charId
+        }
+      },
+      success: function(res) {
+        if (res.result && res.result.success && res.result.data && res.result.data.options) {
+          self.setData({
+            showChoiceMode: true,
+            choiceOptions: res.result.data.options,
+            asrFailed: true
+          });
+        } else {
+          self.setData({ showChoiceMode: false });
+          self.showFeedback('info', '🔄', '识别暂不可用，请重试');
+        }
+      },
+      fail: function(err) {
+        console.error('getOptions失败:', err);
+        self.setData({ showChoiceMode: false });
+        self.showFeedback('info', '🔄', '识别暂不可用，请重试');
+      }
+    });
+  },
+
+  selectFallbackOption: function(e) {
+    var self = this;
+    var selectedId = e.currentTarget.dataset.id;
+    var options = self.data.choiceOptions;
+    var isCorrect = false;
+
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].id === selectedId && options[i].isCorrect) {
+        isCorrect = true;
+        break;
+      }
+    }
+
+    self.setData({ showChoiceMode: false });
+
+    if (isCorrect) {
+      self.processRecognizeResult({ score: 1.0, transcript: '', isAssisted: true });
+    } else {
+      self.processRecognizeResult({ score: 0, transcript: '', isAssisted: true });
+    }
   },
 
   stopRecording: function() {
@@ -301,6 +368,7 @@ Page({
 
   processRecognizeResult: function(result) {
     var self = this;
+    var isAssisted = result.isAssisted || false;
     var score = result.score || 0;
     var isCorrect = score >= 0.7;
 
@@ -310,7 +378,13 @@ Page({
       Delight.playSound('success');
       var newCount = this.data.correctCount + 1;
       this.setData({ correctCount: newCount });
-      this.showFeedback('success', '✅', Delight.getPraise() + ' ' + newCount + '/3');
+
+      if (isAssisted) {
+        // 辅助完成：温和提示
+        this.showFeedback('success', '👍', '选对了！继续加油 ' + newCount + '/3');
+      } else {
+        this.showFeedback('success', '✅', Delight.getPraise() + ' ' + newCount + '/3');
+      }
 
       if (newCount === 1) {
         // 第一颗星，小庆祝
@@ -360,7 +434,7 @@ Page({
       name: 'main',
       data: {
         action: 'recordLearn',
-        data: { openid: openid, charId: charId }
+        data: { openid: openid, charId: charId, isAssisted: self.data.asrFailed }
       },
       success: function(res) {
         console.log('recordLearn result:', JSON.stringify(res.result));

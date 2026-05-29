@@ -1,6 +1,6 @@
 # 儿童识字应用 产品需求文档（PRD）
 
-版本号：V1.3.0
+版本号：V2.0.0
 
 | 版本 | 时间 | 修订人 | 备注 |
 |------|------|--------|------|
@@ -8,6 +8,11 @@
 | V1.1.0 | 2026/05/21 | 王栋 | 修复评审反馈；增加语音识别；优化UI |
 | V1.2.0 | 2026/05/21 | 王栋 | 新增已掌握汉字列表功能 |
 | V1.3.0 | 2026/05/26 | 王栋 | 新增设置页面：关于我们、退出登录 |
+| V1.4.0 | 2026/05/27 | 王栋 | 登录流程改造：微信昵称和头像授权 |
+| V1.5.0 | 2026/05/27 | 王栋 | 严选风格登录页：全屏渐变+漂浮汉字+底部卡片 |
+| V1.5.1 | 2026/05/27 | 王栋 | 登录授权修复：废弃getUserInfo→chooseAvatar+nickname+云存储上传 |
+| V1.6.0 | 2026/05/28 | 王栋 | 手机号授权登录+设置页头像昵称修改+默认头像 |
+| V2.0.0 | 2026/05/28 | 王栋 | 愉悦体验全面升级：delight.js引擎+三页面动画+14组关键帧 |
 
 ---
 
@@ -162,7 +167,7 @@
 
 **"关于我们"详情：**
 - App 名称：儿童识字
-- 版本号：V1.3.0
+- 版本号：V2.0.0
 - 开发者：王东
 - 联系方式：1127907988@qq.com
 
@@ -259,15 +264,47 @@ E:/claude/PMRD/shizi/
 
 ---
 
-## 十、部署步骤
+## 十、愉悦体验引擎 (V2.0.0 新增)
 
-1. 微信开发者工具导入项目，目录选择 `E:\claude\shizi`
+### 10.1 utils/delight.js API
+
+| API | 说明 |
+|-----|------|
+| `vibrate(type)` | 触感反馈（light/medium/heavy） |
+| `shake(page, key)` | 元素抖动效果 |
+| `countUp(page, key, target)` | 单数字滚动动画 |
+| `countUpBatch(page, items)` | 批量数字滚动（items: [{key, value}]） |
+| `burstStars(page)` | 星星粒子特效 |
+| `burstConfetti(page)` | 烟花庆祝特效 |
+| `getComboLevel(n)` | 连击等级判定 |
+| `getRandomPraise()` | 随机鼓励语 |
+| `getRandomEncourage()` | 随机温和鼓励 |
+| `playSound(type)` | 音效振动（success/wrong） |
+
+### 10.2 14组关键帧动画
+
+| 动画 | 用途 | 页面 |
+|------|------|------|
+| entranceSlideUp | 分区入场序列 | 首页 |
+| badgePulse | 成就徽章脉冲 | 首页 |
+| cardBounceIn | 汉字卡片弹性入场 | 学习页 |
+| cardShake | 答错卡片抖动 | 学习页 |
+| rippleExpand | 录音水波纹扩散 | 学习页 |
+| recordPulse | 录音按钮脉冲 | 学习页 |
+| starPop | 进度星星点亮 | 学习页 |
+| starFloat | 星星粒子飘浮 | 学习页 |
+| confettiFall | 烟花纸片飘落 | 学习页 |
+| feedbackPopIn | 反馈卡片弹入 | 学习页 |
+| comboPopIn | 连击徽章弹入 | 复习页 |
+| superComboGlow | 超级连击发光 | 复习页 |
+| correctPop | 复习选项正确弹跳 | 复习页 |
+| wrongShake | 复习选项错误抖动 | 复习页 |
+
+## 十一、部署步骤
+
+1. 微信开发者工具导入项目，目录选择 `E:\claude\PMRD\shizi`，AppID: `wxa2bbfca6b9ef6ebd`
 2. 开通云开发环境（环境ID: `cloud1-d7geippqn581097e3`）
-3. 上传云函数：
-   ```bash
-   npx tcb fn deploy login --dir cloudfunctions/login
-   npx tcb fn deploy main --dir cloudfunctions/main
-   ```
+3. 上传云函数：右键 `cloudfunctions/main` 目录 →「上传并部署：云端安装依赖」
 4. 预览测试
 
 ---
@@ -278,3 +315,10 @@ E:/claude/PMRD/shizi/
 |------|------|--------|------|
 | V1.0.0 | 2026/05/14 | 王栋 | 创建 V1.0.0 版本 |
 | V1.1.0 | 2026/05/21 | 王栋 | 语音识别接入；UI优化；PRD整理 |
+| V1.2.0 | 2026/05/21 | 王栋 | 新增已掌握汉字列表 |
+| V1.3.0 | 2026/05/26 | 王栋 | 新增设置页 |
+| V1.4.0 | 2026/05/27 | 王栋 | 微信昵称头像授权登录 |
+| V1.5.0 | 2026/05/27 | 王栋 | 严选风格登录页改造 |
+| V1.5.1 | 2026/05/27 | 王栋 | 登录授权修复 |
+| V1.6.0 | 2026/05/28 | 王栋 | 手机号授权+设置页修改 |
+| V2.0.0 | 2026/05/28 | 王栋 | 愉悦体验全面升级 |

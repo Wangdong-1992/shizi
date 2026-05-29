@@ -1,0 +1,71 @@
+sequenceDiagram
+    participant User as 用户
+    participant Review as review.js
+    participant Cloud as 云函数main
+    participant ASR as 百度ASR
+    participant DB as 云数据库
+
+    Note over User,DB: === 路径1: review.js 看字说音 ASR成功 ===
+
+    User->>Review: 按住录音(startRecord)
+    User->>Review: 松开停止(stopRecord)
+    Review->>Review: recorderManager.onStop(filePath)
+    Review->>Review: processRecording(filePath)
+    Review->>Review: setData({asrProcessing: true})
+    Review->>Cloud: uploadFile(audio/*.mp3)
+    Cloud-->>Review: fileID
+    Review->>Cloud: recognizeVoice(fileID, targetPinyin)
+    Cloud->>ASR: baiduASR(fileBuffer)
+    ASR-->>Cloud: {err_no:0, result:['ni3hao3']}
+    Cloud->>Cloud: comparePinyin(target, recognized)
+    Cloud-->>Review: {success:true, score:0.85, recognized:'ni3hao3', isCorrect:true}
+    Review->>Review: handleAsrSuccess(score, recognized)
+    Review->>Review: setData({answered:true, asrProcessing:false})
+    Review->>Review: recordReviewResult(charId, true, false)
+    Review->>Cloud: recordReview(openid, charId, speak, true, false, 0.85)
+    Cloud->>DB: review_logs.add({..., is_assisted:false, status:confirmed, asr_score:0.85})
+    Review->>Review: showFeedback(success, ...)
+
+    Note over User,DB: === 路径2: review.js 看字说音 ASR失败降级 ===
+
+    User->>Review: 按住录音(startRecord)
+    User->>Review: 松开停止(stopRecord)
+    Review->>Review: processRecording(filePath)
+    Review->>Cloud: uploadFile → recognizeVoice
+    Cloud-->>Review: {success:false, reason:asr_empty}
+    Review->>Review: handleAsrFailure(asr_empty)
+    Review->>Review: setData({asrProcessing:false})
+    Review->>Cloud: getOptions(charId)
+    Cloud-->>Review: {options: [{id, char, isCorrect}, ...]}
+    Review->>Review: setData({showFallbackChoice:true, fallbackOptions:options})
+    Note over Review,User: 显示降级选择题UI
+    User->>Review: selectFallbackOption(选择某个选项)
+    Review->>Review: 判定isCorrect
+    Review->>Review: setData({answered:true, showFallbackChoice:false})
+    Review->>Review: recordReviewResult(charId, isCorrect, true)
+    Review->>Cloud: recordReview(openid, charId, speak, isCorrect, true, null)
+    Cloud->>DB: review_logs.add({..., is_assisted:true, status:pending, asr_score:null})
+    Review->>Review: showFeedback(...)
+
+    Note over User,DB: === 路径3: learn.js 学习 ASR失败降级 ===
+
+    User->>Participant_Learn as learn.js: 按住跟读(startRecord)
+    User->>Participant_Learn: 松开停止(stopRecord)
+    Participant_Learn->>Participant_Learn: processRecording(filePath)
+    Participant_Learn->>Cloud: uploadFile → recognizeVoice
+    Cloud-->>Participant_Learn: {success:false, reason:asr_error}
+    Participant_Learn->>Participant_Learn: handleAsrFailure(asr_error)
+    Participant_Learn->>Cloud: getOptions(charId)
+    Cloud-->>Participant_Learn: {options: [{id, char, isCorrect}, ...]}
+    Participant_Learn->>Participant_Learn: setData({showChoiceMode:true, choiceOptions:options, asrFailed:true})
+    Note over Participant_Learn,User: 显示"识别暂不可用，请选择正确答案"
+    User->>Participant_Learn: selectFallbackOption(选择某个选项)
+    alt 选择正确
+        Participant_Learn->>Participant_Learn: processRecognizeResult({score:1.0, isAssisted:true})
+        Participant_Learn->>Participant_Learn: correctCount++ (辅助完成)
+    else 选择错误
+        Participant_Learn->>Participant_Learn: processRecognizeResult({score:0, isAssisted:true})
+    end
+    Note over Participant_Learn: 辅助完成correctCount达3次时
+    Participant_Learn->>Cloud: recordLearn(openid, charId, true)
+    Cloud->>DB: users.update({mastered_chars, ...})
