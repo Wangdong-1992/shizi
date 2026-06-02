@@ -10,7 +10,10 @@ exports.main = async (event, context) => {
   const { action, data } = event;
 
   if (action === 'import') {
-    return await importCharacters(data?.offset || 0, data?.limit || BATCH_SIZE);
+    // Node 12 不支持可选链 ?. —— 用传统 && 写法(node 14+ 可改回 ?.)
+    const offset = (data && data.offset) || 0;
+    const limit  = (data && data.limit)  || BATCH_SIZE;
+    return await importCharacters(offset, limit);
   }
 
   if (action === 'check') {

@@ -1059,7 +1059,8 @@ exports.main = async (event, context) => {
       case 'getAchievements': {
         const { openid } = data;
         const userRes = await db.collection('users').where({ openid }).get();
-        const masteredCount = userRes.data[0]?.mastered_chars?.length || 0;
+        // Node 12 不支持可选链 ?. —— 用传统 && 写法(node 14+ 可改回 ?.)
+        const masteredCount = (userRes.data[0] && userRes.data[0].mastered_chars && userRes.data[0].mastered_chars.length) || 0;
 
         const unlockedRes = await db.collection('achievement_log')
           .where({ openid })
