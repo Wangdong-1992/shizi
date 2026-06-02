@@ -737,8 +737,8 @@ Page({
       // 清空画布
       ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-      // 绘制汉字底图（半透明）
-      ctx.font = '180px sans-serif';
+      // 绘制汉字底图（半透明）—— 字号预留 15% 边距,避免贴边
+      ctx.font = '140px sans-serif';
       ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';

@@ -2,3 +2,12 @@ node_modules/
 .cloudbaserc
 *.log
 .DS_Store
+
+# 密钥/环境变量 —— 绝对不能 commit
+.env
+.env.local
+.env.*.local
+
+# IDE 缓存
+.codepilot-uploads/
+.workbuddy/
