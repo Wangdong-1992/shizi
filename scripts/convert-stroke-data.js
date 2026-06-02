@@ -13,12 +13,187 @@
 var fs = require('fs');
 var path = require('path');
 var XLSX = require('xlsx');
+var cnchar = require('cnchar');
+cnchar.use(require('cnchar-order'));
 
 var DATA_DIR = path.join(__dirname, '..', 'node_modules', 'hanzi-writer-data');
 var OUTPUT_FILE = path.join(__dirname, '..', 'utils', 'stroke-data.js');
 var XLSX_FILE = path.join(__dirname, '..', 'docs', '一级字表_拼音.xlsx');
 
 var SCALE = 200 / 1024;
+
+// ---- cnchar direction-type 兼容表 ----
+var DIR_COMPAT = {
+  'h': ['横', '提'],
+  'v': ['竖', '竖钩', '弯钩', '斜钩', '卧钩'],
+  'd': ['撇', '撇折', '撇点'],
+  'u': ['捺', '点', '点2', '提'],
+  't': ['横折', '竖折', '撇折', '横折钩', '竖折折钩', '横折提',
+        '横撇', '横钩', '横斜钩', '竖弯', '竖弯钩', '竖提',
+        '竖折撇', '竖折折', '弯钩', '斜钩', '卧钩',
+        '横折弯', '横折折', '横折折折', '横折折撇', '横折折折钩', '横撇弯钩']
+};
+
+function cnTypeToKey(name) {
+  // 处理 "斜钩|卧钩" 等复合名
+  var bar = name.indexOf('|');
+  return bar >= 0 ? name.substring(0, bar) : name;
+}
+
+/**
+ * 计算笔画边界框 (1024坐标系)
+ */
+function getStrokeBounds(median) {
+  if (!median || median.length === 0) return { centerX: 512, centerY: 512, minY: 0, maxY: 0, rangeY: 0 };
+  var sumX = 0, sumY = 0;
+  var minY = median[0][1], maxY = median[0][1];
+  for (var i = 0; i < median.length; i++) {
+    sumX += median[i][0];
+    sumY += median[i][1];
+    if (median[i][1] < minY) minY = median[i][1];
+    if (median[i][1] > maxY) maxY = median[i][1];
+  }
+  return {
+    centerX: Math.round(sumX / median.length),
+    centerY: Math.round(sumY / median.length),
+    minY: minY,
+    maxY: maxY,
+    rangeY: maxY - minY
+  };
+}
+
+/**
+ * 检测垂直栈: 同一X列、Y不重叠的连续笔画组
+ */
+function detectVerticalStacks(bounds, xThreshold, overlapThreshold) {
+  xThreshold = xThreshold || 250;
+  overlapThreshold = overlapThreshold || 0.3;
+  var groups = [];
+  if (bounds.length < 2) return groups;
+
+  var currentGroup = [0];
+  for (var i = 1; i < bounds.length; i++) {
+    var prev = bounds[i - 1];
+    var curr = bounds[i];
+    var sameRegion = Math.abs(prev.centerX - curr.centerX) < xThreshold;
+    var overlap = Math.max(0, Math.min(prev.maxY, curr.maxY) - Math.max(prev.minY, curr.minY));
+    var minRange = Math.max(prev.rangeY, curr.rangeY, 1);
+    var overlapRatio = overlap / minRange;
+    var verticallySeparated = overlapRatio < overlapThreshold;
+
+    // 防止组横向漂移: 候选笔必须在当前组的 X 范围 + margin 内
+    // 只在组已有 2+ 笔时检查，避免过严的 margin 阻止初始笔对合并
+    var withinGroupX = true;
+    if (currentGroup.length >= 2) {
+      var gMinX = Infinity, gMaxX = -Infinity;
+      for (var g = 0; g < currentGroup.length; g++) {
+        var cx = bounds[currentGroup[g]].centerX;
+        if (cx < gMinX) gMinX = cx;
+        if (cx > gMaxX) gMaxX = cx;
+      }
+      var gWidth = gMaxX - gMinX;
+      var margin = Math.max(gWidth * 0.5, 60);
+      withinGroupX = curr.centerX >= (gMinX - margin) && curr.centerX <= (gMaxX + margin);
+    }
+
+    if (sameRegion && verticallySeparated && withinGroupX) {
+      currentGroup.push(i);
+    } else {
+      if (currentGroup.length >= 2) groups.push(currentGroup.slice());
+      currentGroup = [i];
+    }
+  }
+  if (currentGroup.length >= 2) groups.push(currentGroup.slice());
+  return groups;
+}
+
+/**
+ * 判断垂直栈是否需要翻转 (Y递减 = bottom→top)
+ */
+function shouldReverseGroup(groupIndices, bounds) {
+  var prevY = bounds[groupIndices[0]].centerY;
+  for (var i = 1; i < groupIndices.length; i++) {
+    var currY = bounds[groupIndices[i]].centerY;
+    if (currY >= prevY) return false; // 非严格递减
+    prevY = currY;
+  }
+  return true;
+}
+
+/**
+ * 获取 cnchar 标准笔顺名称
+ */
+function getCnCharTypes(char) {
+  try {
+    var result = cnchar.stroke(char, 'order', 'name');
+    if (result && result[0] && result[0].length > 0) return result[0];
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * 验证翻转后的 direction-type 兼容性
+ */
+function validateReversal(origStrokes, newStrokes, cnTypes) {
+  var origScore = countCompat(origStrokes, cnTypes);
+  var newScore = countCompat(newStrokes, cnTypes);
+  return {
+    valid: newScore >= origScore - 1,  // 允许 1 分退化，防止方向分类误差误杀正确翻转
+    confidence: Math.min(1.0, newScore / Math.max(cnTypes.length, 1))
+  };
+}
+
+function countCompat(strokes, cnTypes) {
+  var score = 0;
+  for (var i = 0; i < Math.min(strokes.length, cnTypes.length); i++) {
+    var dir = strokes[i].direction;
+    var cnKey = cnTypeToKey(cnTypes[i]);
+    var compat = DIR_COMPAT[dir];
+    if (compat && compat.indexOf(cnKey) >= 0) score++;
+  }
+  return score;
+}
+
+/**
+ * 对转换后的笔画进行笔顺纠正
+ * @returns {{ strokes, fixed: boolean, log: string }}
+ */
+function fixStrokeOrder(medians, strokes, charName) {
+  var result = { strokes: strokes, fixed: false, log: '' };
+  var cnTypes = getCnCharTypes(charName);
+  if (!cnTypes || cnTypes.length !== strokes.length) return result;
+  if (strokes.length < 2) return result;
+
+  var bounds = medians.map(function(m) { return getStrokeBounds(m); });
+  var stacks = detectVerticalStacks(bounds);
+
+  var totalFixed = 0;
+  for (var s = 0; s < stacks.length; s++) {
+    var group = stacks[s];
+    if (!shouldReverseGroup(group, bounds)) continue;
+
+    // 翻转
+    var newStrokes = strokes.slice();
+    var reversed = group.slice().reverse();
+    for (var i = 0; i < group.length; i++) {
+      newStrokes[group[i]] = strokes[reversed[i]];
+    }
+
+    var validation = validateReversal(strokes, newStrokes, cnTypes);
+    if (validation.valid && validation.confidence >= 0.3) {
+      strokes = newStrokes;
+      totalFixed++;
+    }
+  }
+
+  if (totalFixed > 0) {
+    result.strokes = strokes;
+    result.fixed = true;
+    result.log = '  [FIX] ' + charName + ': ' + totalFixed + '组垂直栈翻转 ('
+      + stacks.length + '组检测到)';
+  }
+  return result;
+}
 
 // 从一级字表读取完整字符列表
 function loadTargetChars() {
@@ -126,7 +301,13 @@ function convertChar(charName) {
       });
     }
 
-    return { char: charName, strokes: strokes };
+    // 笔顺纠正: 检测垂直栈并翻转
+    var fixResult = fixStrokeOrder(medians, strokes, charName);
+    if (fixResult.fixed) {
+      fixLog.push(fixResult.log);
+    }
+
+    return { char: charName, strokes: fixResult.strokes };
   } catch (e) {
     console.error('  [ERR] ' + charName + ': ' + e.message);
     return null;
@@ -229,6 +410,7 @@ console.log('');
 var converted = {};
 var successCount = 0;
 var skipCount = 0;
+var fixLog = [];
 
 for (var c = 0; c < TARGET_CHARS.length; c++) {
   var charName = TARGET_CHARS[c];
@@ -244,6 +426,13 @@ for (var c = 0; c < TARGET_CHARS.length; c++) {
 console.log('');
 console.log('成功: ' + successCount + ' 字');
 console.log('跳过: ' + skipCount + ' 字');
+if (fixLog.length > 0) {
+  console.log('');
+  console.log('笔顺纠正 (' + fixLog.length + ' 字):');
+  for (var fl = 0; fl < fixLog.length; fl++) {
+    console.log(fixLog[fl]);
+  }
+}
 console.log('');
 
 // 生成输出文件

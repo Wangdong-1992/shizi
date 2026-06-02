@@ -3,6 +3,37 @@
     <text>加载中...</text>
   </view>
 
+  <!-- R-13: 每日新字配额用完 -->
+  <view wx:if="{{!loading && dailyQuotaReached}}" class="quota-card">
+    <view class="quota-emoji">📚</view>
+    <text class="quota-title">今日新字已达标</text>
+    <text class="quota-reason">{{dailyQuotaReason}}</text>
+    <view class="quota-stats">
+      <view class="quota-stat">
+        <text class="quota-stat-num">{{dailyNewLearned}}</text>
+        <text class="quota-stat-label">今日已学</text>
+      </view>
+      <view class="quota-stat-divider"></view>
+      <view class="quota-stat">
+        <text class="quota-stat-num">{{dailyNewLimit}}</text>
+        <text class="quota-stat-label">每日上限</text>
+      </view>
+      <view class="quota-stat-divider"></view>
+      <view class="quota-stat">
+        <text class="quota-stat-num">{{pendingReview}}</text>
+        <text class="quota-stat-label">待复习</text>
+      </view>
+    </view>
+    <view class="quota-actions">
+      <view class="quota-btn primary" bindtap="goToReview">
+        <text>去复习</text>
+      </view>
+      <view class="quota-btn secondary" bindtap="goHome">
+        <text>返回首页</text>
+      </view>
+    </view>
+  </view>
+
   <view wx:if="{{!loading && currentChar}}" class="content">
 
     <!-- ==================== 步骤进度条 ==================== -->
@@ -145,6 +176,74 @@
           </view>
         </view>
       </view>
+    </view>
+
+    <!-- ==================== V2.3 小复习 ==================== -->
+
+    <!-- 小复习进行中 -->
+    <view wx:if="{{miniReviewActive && !miniReviewCompleted}}" class="mini-review-content">
+      <view class="mini-review-header">
+        <text class="mini-review-title">📝 小复习</text>
+        <text class="mini-review-progress">{{miniReviewIndex + 1}}/{{miniReviewChars.length}}</text>
+      </view>
+
+      <view class="mini-review-hint">听到发音，选出正确的字</view>
+
+      <!-- 播放发音按钮 -->
+      <view class="mini-review-play" bindtap="playMiniReviewAudio">
+        <text class="mini-review-play-icon">🔊</text>
+        <text class="mini-review-play-text">再听一次</text>
+      </view>
+
+      <!-- 3选1选项 -->
+      <view class="mini-review-options" wx:if="{{miniReviewOptions.length > 0}}">
+        <view wx:for="{{miniReviewOptions}}" wx:key="id"
+          class="step2-option {{miniReviewAnswered && item.isCorrect ? 'correct-pop' : ''}} {{miniReviewAnswered && miniReviewSelectedId === item.id && !item.isCorrect ? 'wrong-shake' : ''}} {{miniReviewAnswered && miniReviewSelectedId !== item.id ? 'dim' : ''}}"
+          bindtap="onMiniReviewSelect" data-id="{{item.id}}">
+          <text class="step2-option-char">{{item.char}}</text>
+        </view>
+      </view>
+
+      <!-- 加载中 -->
+      <view wx:if="{{miniReviewOptions.length === 0 && !miniReviewAnswered}}" class="step2-loading">
+        <text>加载题目中...</text>
+      </view>
+    </view>
+
+    <!-- 小复习完成摘要 -->
+    <view wx:if="{{miniReviewCompleted && miniReviewSummary}}" class="mini-review-summary">
+      <view class="summary-card">
+        <text class="summary-emoji">{{miniReviewSummary.wrong === 0 ? '🎉' : '💪'}}</text>
+        <text class="summary-title">{{miniReviewSummary.wrong === 0 ? '全部正确！' : '小复习完成'}}</text>
+        <view class="summary-stats">
+          <view class="summary-stat">
+            <text class="summary-stat-num correct">{{miniReviewSummary.correct}}</text>
+            <text class="summary-stat-label">答对</text>
+          </view>
+          <view class="summary-stat" wx:if="{{miniReviewSummary.wrong > 0}}">
+            <text class="summary-stat-num wrong">{{miniReviewSummary.wrong}}</text>
+            <text class="summary-stat-label">需加强</text>
+          </view>
+        </view>
+        <view class="summary-detail" wx:if="{{miniReviewSummary.wrong > 0}}">
+          <text class="summary-detail-text">答错的字会在复习中优先出现</text>
+        </view>
+        <view class="summary-actions">
+          <view class="summary-btn primary" bindtap="continueLearning">
+            <text>继续学习</text>
+          </view>
+          <view class="summary-btn secondary" bindtap="goHome">
+            <text>返回首页</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ==================== V2.3 渐进式错误提示 ==================== -->
+    <view wx:if="{{showProgressiveHint}}" class="progressive-hint hint-level-{{progressiveHintLevel}}">
+      <text class="progressive-hint-icon">{{progressiveHintLevel === 3 ? '📖' : '💡'}}</text>
+      <text class="progressive-hint-text">{{progressiveHintText}}</text>
+      <text wx:if="{{progressiveHintLevel < 3}}" class="progressive-hint-retry">再试一次</text>
     </view>
 
     <!-- ==================== 反馈卡片 ==================== -->

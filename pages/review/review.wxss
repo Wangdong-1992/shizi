@@ -7,24 +7,111 @@ page {
   padding: 32rpx;
 }
 
-/* ====== 模式切换 ====== */
-.mode-tabs {
+/* ====== R-12: 题型标签 ====== */
+.question-type-tag {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20rpx;
+  padding: 16rpx 32rpx;
   background: white;
-  border-radius: 40rpx;
-  padding: 8rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.08);
+  border-radius: 32rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
 }
 
-.tab {
-  flex: 1;
-  text-align: center;
-  padding: 24rpx;
-  border-radius: 32rpx;
+.type-tag-icon {
+  font-size: 32rpx;
+  margin-right: 12rpx;
+}
+
+.type-tag-label {
   font-size: 28rpx;
-  color: #666;
-  transition: all 0.3s;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.type-hint {
+  text-align: center;
+  font-size: 26rpx;
+  color: #999;
+  margin-bottom: 24rpx;
+}
+
+/* ====== R-12: 通用题目区域 ====== */
+.question-area {
+  background: white;
+  border-radius: 24rpx;
+  padding: 40rpx 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
+}
+
+/* ====== R-12: 看拼音选字 - 拼音展示 ====== */
+.pinyin-display {
+  text-align: center;
+  font-size: 72rpx;
+  font-weight: 700;
+  color: #FF6B35;
+  margin: 40rpx 0;
+  letter-spacing: 4rpx;
+}
+
+/* ====== R-12: 释义/词语文本选项 ====== */
+.text-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-top: 32rpx;
+}
+
+.text-option-item {
+  padding: 28rpx 32rpx;
+  background: #F8FAFB;
+  border: 2rpx solid #E8ECF0;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  color: #333;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.text-option-item:active {
+  background: #E8F4FD;
+  border-color: #4A90D9;
+  transform: scale(0.97);
+}
+
+.text-option-item.selected {
+  background: #E8F4FD;
+  border-color: #4A90D9;
+  color: #2c3e50;
+}
+
+.text-option-item.correct-pop {
+  background: #E8F8E8;
+  border-color: #4CAF50;
+  color: #2E7D32;
+  animation: correctPop 0.5s ease;
+}
+
+.text-option-item.wrong-shake {
+  background: #FFEBEE;
+  border-color: #F44336;
+  color: #C62828;
+  animation: shake 0.5s ease;
+}
+
+.meaning-char, .word-char {
+  font-size: 96rpx;
+  text-align: center;
+  margin: 32rpx 0 8rpx;
+}
+
+.meaning-pinyin, .word-pinyin {
+  text-align: center;
+  font-size: 28rpx;
+  color: #999;
+  margin-bottom: 8rpx;
 }
 
 .tab.active {
@@ -684,4 +771,52 @@ page {
   0%   { transform: rotate(-15deg) scale(0.5); }
   50%  { transform: rotate(10deg) scale(1.1); }
   100% { transform: rotate(0deg) scale(1); }
+}
+
+/* ==================== V2.3 渐进式错误提示 ==================== */
+.progressive-hint {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx 32rpx;
+  border-radius: 32rpx;
+  margin-top: 24rpx;
+  animation: feedbackPop 0.35s ease-out;
+}
+
+.progressive-hint.hint-level-1 {
+  background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+  border: 2rpx solid #90CAF9;
+}
+
+.progressive-hint.hint-level-2 {
+  background: linear-gradient(135deg, #FFF3CD, #FFE69C);
+  border: 2rpx solid #FFB74D;
+}
+
+.progressive-hint.hint-level-3 {
+  background: linear-gradient(135deg, #FFEBEE, #FFCDD2);
+  border: 2rpx solid #EF9A9A;
+}
+
+.progressive-hint-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.progressive-hint-text {
+  font-size: 26rpx;
+  color: #333;
+  font-weight: 500;
+  flex: 1;
+}
+
+.progressive-hint-retry {
+  font-size: 24rpx;
+  color: #4A90D9;
+  font-weight: bold;
+  flex-shrink: 0;
+  padding: 6rpx 16rpx;
+  background: rgba(74, 144, 217, 0.15);
+  border-radius: 20rpx;
 }

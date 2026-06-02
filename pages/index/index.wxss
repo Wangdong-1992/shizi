@@ -176,6 +176,45 @@ page {
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* ====== R-15: 分享成就卡片 ====== */
+.share-card-area {
+  margin-bottom: 24rpx;
+}
+
+.share-card-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 32rpx;
+  padding: 28rpx 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  box-shadow: 0 8rpx 32rpx rgba(102, 126, 234, 0.35);
+  transition: transform 0.15s;
+}
+
+.share-card-btn:active {
+  transform: scale(0.97);
+}
+
+.share-card-icon {
+  font-size: 48rpx;
+  flex-shrink: 0;
+}
+
+.share-card-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: white;
+}
+
+.share-card-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 600px;
+  height: 480px;
+}
+
 /* ====== 操作区域 ====== */
 .actions {
   margin-bottom: 32rpx;
@@ -595,4 +634,120 @@ page {
 @keyframes achievementPop {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.05); }
+}
+
+/* ====== R-14: 成长等级 ====== */
+.growth-avatar-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-right: 24rpx;
+}
+
+.growth-icon {
+  font-size: 64rpx;
+}
+
+.growth-label {
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+.growth-bar-wrap {
+  margin-top: 12rpx;
+  width: 100%;
+}
+
+.growth-bar {
+  height: 8rpx;
+  background: #E8ECF0;
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+
+.growth-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4A90D9, #7AB3ED);
+  border-radius: 4rpx;
+  transition: width 0.8s ease;
+}
+
+.growth-bar-text {
+  font-size: 20rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+/* ====== R-14: 每日进度 + 个人最佳 ====== */
+.progress-section {
+  margin: 0 8rpx 20rpx;
+  background: white;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
+}
+
+.section-row {
+  display: flex;
+  gap: 24rpx;
+}
+
+.section-half {
+  flex: 1;
+}
+
+.section-mini-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 12rpx;
+  display: block;
+}
+
+.mini-progress-bar {
+  height: 10rpx;
+  background: #E8ECF0;
+  border-radius: 5rpx;
+  overflow: hidden;
+  margin-bottom: 8rpx;
+}
+
+.mini-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B35, #FFA06B);
+  border-radius: 5rpx;
+  transition: width 0.8s ease;
+}
+
+.mini-progress-text {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.best-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.best-item {
+  flex: 1;
+  text-align: center;
+  background: #F8FAFB;
+  border-radius: 12rpx;
+  padding: 16rpx 8rpx;
+}
+
+.best-num {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #4A90D9;
+  display: block;
+}
+
+.best-label {
+  font-size: 20rpx;
+  color: #999;
+  margin-top: 2rpx;
+  display: block;
 }

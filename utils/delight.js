@@ -185,13 +185,49 @@ var Delight = {
    * 获取随机表扬语（答对时用）
    * @returns {string}
    */
+  /**
+   * R-14: 过程表扬语 — 强调努力、观察、坚持，而非结果
+   * @returns {string}
+   */
   getPraise: function () {
     var list = [
-      '太棒了！', '真厉害！', '好聪明！', '完美！',
-      '真了不起！', '学得真好！', '真不错！', '棒棒哒！',
-      '好极了！', '一百分！', '小天才！', '真聪明！'
+      '你认真观察了字形！', '听得真仔细！', '练习让认识更牢固！',
+      '你在进步！', '用心记就记住了！', '看，多练几次就会了！',
+      '你的努力有回报！', '坚持就会有进步！', '每一次练习都有用！',
+      '动脑筋的小朋友最棒！', '你越来越熟练了！', '记住这个字了！'
     ];
     return list[Math.floor(Math.random() * list.length)];
+  },
+
+  /**
+   * R-14: 场景化过程表扬 — 根据上下文返回针对性表扬
+   * @param {object} context - { retryCount, comboCount, exerciseType }
+   * @returns {string}
+   */
+  getProcessPraise: function (context) {
+    context = context || {};
+    var retry = context.retryCount || 0;
+    var combo = context.comboCount || 0;
+
+    // 重试后正确：强调坚持
+    if (retry >= 2) {
+      var retryPraises = [
+        '试了几次终于对了，真努力！', '不放弃就能学会！',
+        '看，多试几次就记住了！', '坚持下来真棒！'
+      ];
+      return retryPraises[Math.floor(Math.random() * retryPraises.length)];
+    }
+
+    // 连击：强调持续进步
+    if (combo >= 5) {
+      return '连续答对' + combo + '题，你的坚持有回报！';
+    }
+    if (combo >= 3) {
+      return '一直在进步，继续加油！';
+    }
+
+    // 默认过程表扬
+    return this.getPraise();
   },
 
   /**

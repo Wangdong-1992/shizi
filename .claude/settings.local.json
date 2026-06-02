@@ -129,7 +129,13 @@
       "Bash(ping *)",
       "Bash(git remote *)",
       "Bash(bl auth *)",
-      "Bash(bl image *)"
+      "Bash(bl image *)",
+      "Bash(cp \"E:/claude/PMRD/shizi/pages/index/index.wxml\" \"E:/claude/PMRD/shizi-docs/\")",
+      "Bash(cp \"E:/claude/PMRD/shizi/pages/index/index.js\" \"E:/claude/PMRD/shizi-docs/\")",
+      "Bash(cp \"E:/claude/PMRD/shizi/pages/index/index.wxss\" \"E:/claude/PMRD/shizi-docs/\")",
+      "Bash(cp \"E:/claude/PMRD/shizi/pages/profile/profile.js\" \"E:/claude/PMRD/shizi-docs/\")",
+      "Bash(cp \"E:/claude/PMRD/shizi/docs/CLAUDE.md\" \"E:/claude/PMRD/shizi-docs/\")",
+      "Bash(npm list *)"
     ]
   }
 }
