@@ -1969,7 +1969,8 @@ exports.main = async (event, context) => {
         }
       }
 
-      // 发送复习提醒（由定时触发器或手动调用）
+      // 发送复习提醒(由定时触发器或手动调用)
+      // V2.3 P1 改造:分批并行 + 同一天去重(避免定时器反复触发导致重复推送)
       case 'sendReviewReminder': {
         try {
           var todayObj = new Date();
@@ -1979,61 +1980,118 @@ exports.main = async (event, context) => {
             String(todayObj.getDate()).padStart(2, '0');
 
           // 查询所有订阅了推送的用户
-          var subscribedUsers = await db.collection('users')
+          var subscribedUsersRes = await db.collection('users')
             .where({ push_subscribed: true })
             .limit(100)
             .get();
 
-          if (!subscribedUsers.data || subscribedUsers.data.length === 0) {
+          if (!subscribedUsersRes.data || subscribedUsersRes.data.length === 0) {
             return { success: true, sent: 0, message: '无订阅用户' };
           }
 
+          // 过滤掉今天已经推过的(用 users.push_last_sent_date 字段做幂等)
+          // 避免定时器重试 / 手动调用 / 多实例并发导致同一天推多次
+          var pendingUsers = subscribedUsersRes.data.filter(function(u) {
+            return u.push_last_sent_date !== todayStr;
+          });
+          var skippedToday = subscribedUsersRes.data.length - pendingUsers.length;
+
+          if (pendingUsers.length === 0) {
+            return {
+              success: true,
+              sent: 0,
+              skipped: skippedToday,
+              message: '今日已全部推送'
+            };
+          }
+
           var accessToken = await getWxAccessToken();
+
+          // 分批处理(每批 BATCH_SIZE 个用户,Promise.all 并行)
+          // 为什么 10:微信订阅消息 API 限流 50/分钟/小程序,10 个并发单批 ~1-2s,基本不触发
+          var BATCH_SIZE = 10;
           var sentCount = 0;
           var failCount = 0;
 
-          for (var si = 0; si < subscribedUsers.data.length; si++) {
-            var user = subscribedUsers.data[si];
-            try {
-              // 检查是否有待复习的字
-              var pendingRes = await db.collection('learning_progress')
-                .where({
-                  openid: user.openid,
-                  next_review_date: _.lte(todayStr),
-                  status: _.in(['seeing', 'familiar', 'mastered'])
-                })
-                .limit(1)
-                .get();
+          for (var bi = 0; bi < pendingUsers.length; bi += BATCH_SIZE) {
+            var batch = pendingUsers.slice(bi, bi + BATCH_SIZE);
 
-              var hasPending = pendingRes.data && pendingRes.data.length > 0;
-              if (!hasPending) {
-                continue;
-              }
+            // 包装每个用户的推送逻辑为 Promise
+            var batchPromises = batch.map(function(user) {
+              return (async function() {
+                try {
+                  // 检查是否有待复习的字
+                  var pendingRes = await db.collection('learning_progress')
+                    .where({
+                      openid: user.openid,
+                      next_review_date: _.lte(todayStr),
+                      status: _.in(['seeing', 'familiar', 'mastered'])
+                    })
+                    .limit(1)
+                    .get();
 
-              // 发送服务通知
-              var pushResult = await sendSubscribeMessage(accessToken, user.openid, {
-                template_id: 'REVIEW_REMINDER_TEMPLATE_ID',
-                page: '/pages/review/review',
-                data: {
-                  thing1: { value: '复习提醒' },
-                  time2: { value: todayStr + ' 18:00' },
-                  thing3: { value: '你有汉字需要复习巩固，点击开始复习吧！' }
+                  var hasPending = pendingRes.data && pendingRes.data.length > 0;
+                  if (!hasPending) {
+                    return { skipped: true, reason: 'no_pending' };
+                  }
+
+                  // 发送服务通知
+                  var pushResult = await sendSubscribeMessage(accessToken, user.openid, {
+                    template_id: 'REVIEW_REMINDER_TEMPLATE_ID',
+                    page: '/pages/review/review',
+                    data: {
+                      thing1: { value: '复习提醒' },
+                      time2: { value: todayStr + ' 18:00' },
+                      thing3: { value: '你有汉字需要复习巩固，点击开始复习吧！' }
+                    }
+                  });
+
+                  if (pushResult.errcode === 0) {
+                    return { sent: true };
+                  } else {
+                    return {
+                      sent: false,
+                      errcode: pushResult.errcode,
+                      errmsg: pushResult.errmsg
+                    };
+                  }
+                } catch (e) {
+                  return { sent: false, error: e.message };
                 }
-              });
+              })();
+            });
 
-              if (pushResult.errcode === 0) {
+            // 并行等这一批完成
+            var batchResults = await Promise.all(batchPromises);
+
+            // 处理这一批结果 + 标记已推送的用户
+            for (var bri = 0; bri < batch.length; bri++) {
+              var u = batch[bri];
+              var r = batchResults[bri];
+              if (r.sent) {
                 sentCount++;
+                // 标记今天已推(异步,不阻塞下一批)
+                db.collection('users').where({ openid: u.openid }).update({
+                  data: { push_last_sent_date: todayStr }
+                }).catch(function(markErr) {
+                  console.error('mark push_last_sent_date fail:', u.openid, markErr.message);
+                });
+              } else if (r.skipped) {
+                // 没待复习内容,不算 sent 也不算 fail
               } else {
                 failCount++;
-                console.error('推送失败 openid=' + user.openid + ' errcode=' + pushResult.errcode + ' errmsg=' + pushResult.errmsg);
+                console.error('推送失败 openid=' + u.openid, r);
               }
-            } catch (userErr) {
-              failCount++;
-              console.error('推送异常 openid=' + user.openid + ':', userErr.message);
             }
           }
 
-          return { success: true, sent: sentCount, fail: failCount, total: subscribedUsers.data.length };
+          return {
+            success: true,
+            sent: sentCount,
+            fail: failCount,
+            skipped: skippedToday,
+            total: subscribedUsersRes.data.length
+          };
         } catch (err) {
           console.error('sendReviewReminder error:', err.message);
           return { success: false, error: err.message };
