@@ -27,7 +27,9 @@ E:/claude/PMRD/shizi/
 │   ├── mastered/                      # 已掌握汉字列表
 │   └── settings/                      # 设置页
 ├── scripts/
-│   └── convert-stroke-data.js          # 笔顺数据生成脚本
+│   ├── convert-stroke-data.js          # 笔顺数据生成（hanzi-writer-data + cnchar校准）
+│   ├── verify-regenerated.js           # 笔顺验证（检查生成后2256字笔顺正确性）
+│   └── audit-stroke-order.js           # 源数据审计（检查hanzi-writer-data原始笔顺问题）
 ├── utils/
 │   ├── delight.js                      # V2.0 愉悦体验引擎
 │   ├── spaced-repetition.js            # V2.2 间隔重复算法模块
@@ -98,24 +100,38 @@ E:/claude/PMRD/shizi/
 
 ## 云函数接口 (main)
 
+> **当前数量：22 个 action**（截至 V2.3）。所有业务逻辑统一在 `cloudfunctions/main/index.js` 的 switch 路由里，按"用户/学习/复习/统计/语音/运维"六类分。
+
 | action | 说明 | 参数 |
 |--------|------|------|
-| wxLogin | 微信登录（code换openid + 生成token） | { code, nickname, avatarUrl } |
-| getUser | 获取用户信息 | { openid } |
-| getStats | 获取用户统计 | { openid } |
-| getNextChar | 获取下一个待学汉字 | { openid } |
-| getLearnChar | 获取字详情+笔顺+学习进度 | { openid, charId } |
-| recordLearn | 记录学习完成（含奖励发放） | { openid, charId } |
-| getPendingReview | 获取待复习列表（优先级排序） | { openid, limit } |
-| getAchievements | 获取成就列表 | { openid } |
-| getOptions | 获取听音选字选项 | { charId } |
-| recordReview | 记录复习结果（三写：日志+进度+状态） | { openid, charId, reviewMode, isCorrect, exerciseType } |
-| migrateProgress | 旧数据按需迁移 | { openid } |
-| recognizeVoice | 百度语音识别 | { fileID, targetPinyin } |
-| getAudio | 百度TTS发音 | { char, pinyin } |
-| updateUserInfo | 更新用户信息（头像/昵称） | { openid, nickname, avatarUrl } |
-| getPhoneNumber | 微信手机号解密 | { code } |
-| getMasteredChars | 获取已掌握汉字列表 | { openid } |
+| **用户/认证** | | |
+| `wxLogin` | 微信登录（code换openid + 生成token） | { code, nickname, avatar } |
+| `getUser` | 获取用户信息 | { openid } |
+| `updateUserInfo` | 更新用户信息（头像/昵称） | { openid, nickname, avatar_url/avatarUrl } |
+| `getPhoneNumber` | 微信手机号解密 | { code } |
+| `subscribeReminder` | 订阅/取消复习提醒 | { openid, subscribed } |
+| **学习核心** | | |
+| `getNextChar` | 获取下一个待学汉字（新字路径） | { openid } |
+| `getLearnChar` | 获取字详情+笔顺+学习进度 | { openid, charId } |
+| `recordLearn` | 记录学习完成 + 奖励 + **同步创建 learning_progress**（V2.3 修复） | { openid, charId, isAssisted } |
+| **复习核心** | | |
+| `getPendingReview` | 获取待复习列表（V2.2 优先级算法） | { openid, limit } |
+| `getOptions` | 获取听音选字选项（兼容旧调用） | { charId, shapeSimilar } |
+| `getQuestionOptions` | 获取指定题型选项（V2.3，5 种题型） | { charId, questionType } |
+| `recordReview` | 记录复习结果（三写：review_logs + learning_progress + 状态机） | { openid, charId, reviewMode, isCorrect, isAssisted, asrScore, exerciseType, errorType } |
+| **统计/成就** | | |
+| `getStats` | 用户统计 + 成长等级 + 每日进度（V2.3 改用 learning_progress 查"已掌握"） | { openid } |
+| `getDailyStats` | 今日新字 + 待复习 + 配额判断 | { openid } |
+| `getAchievements` | 成就列表 | { openid } |
+| `getMasteredChars` | 已掌握汉字列表（V2.3 改用 learning_progress.status in [familiar,mastered,solid]） | { openid } |
+| **语音/百度** | | |
+| `recognizeVoice` | 百度语音识别（ASR） | { fileID, targetPinyin } |
+| `getAudio` | 百度 TTS 发音 | { char, pinyin } |
+| **运维** | | |
+| `migrateProgress` | 旧数据按需迁移（mastered_chars → learning_progress familiar） | { openid } |
+| `cleanReviewLogs` | R-16 清洗 V2.1 之前的假阳性 review_logs（打 `data_quality="unreliable_pre_fix"` 标签） | { cutoffDate, dryRun, batchSize } |
+| `sendReviewReminder` | 定时器触发，订阅用户推送复习提醒 | （定时器或手动） |
+| `resetUserData` | **V2.3 危险操作**：清空当前用户所有学习数据。生产路径用 `{ confirm: true }`（用 wxContext.OPENID 锁定）；云端调试需 `{ devMode: true, openid, confirm: true }` | { confirm, devMode?, openid? } |
 
 ## V2.0 愉悦体验引擎 (utils/delight.js)
 
@@ -136,6 +152,41 @@ E:/claude/PMRD/shizi/
 - 首页：entranceSlideUp（分区入场）+ badgePulse（成就脉冲）+ 数字滚动
 - 学习页：cardBounceIn（卡片弹性）+ rippleExpand（录音波纹）+ starFloat（星星粒子）+ confettiFall（烟花）+ feedbackPopIn（反馈弹窗）
 - 复习页：comboPopIn（连击徽章）+ superComboGlow（超级发光）+ correctPop/wrongShake（选项反馈）
+
+## V2.3 新增工具
+
+### utils/audio.js（TTS 拉取 + 自动重试）
+
+百度 TTS 直链带一次性 `access_token`，云函数内部 token 偶尔失效会导致音频播放失败。`utils/audio.js` 抽出来统一处理：
+
+| API | 说明 |
+|-----|------|
+| `fetchTTS(char, pinyin, retryLeft, onSuccess, onFail)` | 拉音频 URL，失败按 retryLeft 递归重试 |
+| `playTTS(char, pinyin, onFallback)` | 便捷方法：拉 URL → 播放 → 失败走 onFallback，内部默认重试 1 次 |
+
+**调用方：** `learn.js` 的 `playAudio` / `playMiniReviewAudio`，`review.js` 的 `playAudio` 都改用 `TTS.playTTS`，遇到 token 失效会自动重试一次，第二次失败才走 fallback（显示拼音文字）。
+
+### pages/learn/learn.js — `resetLearnStateMachine()`
+
+**切字前**必须调用的公共重置方法。`loadChar()`（新字学习）和 `checkMasteredChar()`（从已掌握页面进入）都通过 `Object.assign` 调它。
+
+```js
+// 用法
+this.setData(Object.assign({
+  // 自己特有的字段（如 loading=true/false、字本身）
+  ...
+}, this.resetLearnStateMachine()));
+```
+
+**它重置的字段**（25+ 个，统一收口，未来新增"切字时需要清零"的字段只在这里加一次）：
+- 四步状态机本体：`currentStep / stepCompleted / stepResults / learnCompleted / finalResult / feedbackShow`
+- Step2 再认：`step2Options / step2Answered / step2Correct / step2SelectedId`
+- Step3 描红：`strokePaths / strokeIndex / strokeCompleted / hasStrokeData / totalStrokes / strokeDeviation`
+- Step4 跟读：`step4Correct / step4Answered / asrFailed / asrProcessing / showChoiceMode / choiceOptions`
+- V2.3 渐进提示：`charErrorCount / showProgressiveHint / progressiveHintText / progressiveHintLevel`
+- R-13 每日配额：`dailyQuotaReached / dailyQuotaReason`
+
+**为什么需要它：** 修复 V2.2 上线后"上一个字学完直接进入下一个字时残留 learnCompleted=true"导致的"学会了"弹窗 bug（V2.3 修复 1）。
 
 ## 已完成功能
 
@@ -160,43 +211,103 @@ E:/claude/PMRD/shizi/
 - [x] 间隔重复引擎（V2.2）：utils/spaced-repetition.js + Leitner Box (1-5级) + 五级掌握状态机 + 优先级调度
 - [x] 四步递进学习页重构（V2.2）：释义→再认→描红→跟读，单页状态机
 - [x] 复习页适配（V2.2）：Box升降反馈 + 状态变迁提示 + exerciseType参数
-- [x] 笔顺数据生成（V2.2）：scripts/convert-stroke-data.js + hanzi-writer-data → 2256字完整笔顺数据(GB 13000.1)
+- [x] 笔顺数据生成（V2.2）：scripts/convert-stroke-data.js + hanzi-writer-data → cnchar校准 + Y-overlap垂直栈翻转 → 2256字完整笔顺数据(GB 13000.1)，1197字自动纠正
 - [x] 旧数据按需迁移（V2.2）：migrateProgress云函数，首页首次访问触发
 - [x] 云函数 recordReview 三写闭环：review_logs + learning_progress + 状态信息返回
+- [x] **V2.3 P0 修复**：密钥从代码中剥离，改用云函数环境变量
+- [x] **V2.3 P0 修复**：recordLearn 同步创建 learning_progress（之前漏，导致新字不进复习队列）
+- [x] **V2.3 P0 修复**：getStats / getMasteredChars 改用 learning_progress 计算，过滤 V2.1 假阳性
+- [x] **V2.3 P0 修复**：客户端 getAudio 自动重试，新建 utils/audio.js
+- [x] **V2.3**：云函数新增 resetUserData action（清空当前用户学习数据）
+- [x] **V2.3**：settings 页加 "清除学习数据" 按钮（带二次确认）
+- [x] **V2.3 架构优化**：pages/learn/learn.js 抽出 resetLearnStateMachine 公共方法，loadChar / checkMasteredChar 共用
 
 ## 已修复Bug
 
 ### mastered_chars 计数不一致（首页与列表页数量不同）
 
-**现象**：
+**现象（V2.2 上线时）**：
 - `getStats` 数数组 = 7，`getMasteredChars` 交叉比对 = 6（悬空ID）
 - 后 `getStats` 改纯去重 → 首页变7、列表仍是6（不一致）
 - 又现 `countUpBatch` 参数名 bug → 首页始终显示0
 
-**最终修复方案（2026-05-28）**：
+**2026-05-28 修复方案**：
 1. **云函数** `getStats` 改用与 `getMasteredChars` 完全一致的算法：去重 → 查 characters 表 `id`/`_id` 双向匹配 → 再去重 → 计数
 2. **前端** `utils/delight.js:103` `countUpBatch` 参数名修复：`item.target` → `item.value || item.target`
+
+**2026-06-01 V2.3 二次修复**（同源 bug，本质根除）：
+- `getStats` 和 `getMasteredChars` **统一改为用 `learning_progress.status in [familiar, mastered, solid]` 查"已掌握"**
+- 不再依赖 `users.mastered_chars` 数组（V2.1 假阳性的源头）
+- 两边用完全相同的查询条件 + Set 去重，**首页和列表页从此不再可能不一致**
 
 ### profile 头像 cloud:// 路径乱码
 
 **修复**：profile.js 检测 `cloud://` → `wx.cloud.getTempFileURL()` 转临时 HTTPS 链接 → WXML 条件渲染
 
+### tabBar 页面二次进入时 fromMasteredChar 不消费（V2.3 修复 1）
+
+**现象**：从"已掌握"列表点字进入 learn 页，无论选哪个字都显示"一"字。
+
+**根因**：
+- `learn` 是 tabBar 页面。微信 tabBar 页面生命周期：**首次进入** 触发 `onLoad`+`onShow`，**二次进入** 只触发 `onShow`，**不再触发 `onLoad`**
+- 第一次进 learn 时已设过 `currentChar`，导致 `onShow` 中的判断 `!this.data.currentChar && !this.data.loading` 一直为 false，**`fromMasteredChar` 永远不被消费**
+
+**修复**：`onShow` 优先消费 `app.globalData.fromMasteredChar`，再走老逻辑。
+
+### 切字时四步状态机残留（V2.3 修复 2）
+
+**现象**：在已掌握里学完一个字"工"后，再点其他字进入学习页，**直接显示"学会了"庆祝弹窗**，四步流程全跳过。
+
+**根因**：`checkMasteredChar` 只更新字本身，**没有重置 `learnCompleted / currentStep / stepCompleted / stepResults / feedbackShow` 等 25+ 个状态字段**。
+
+**修复**：抽出公共方法 `resetLearnStateMachine()`，`loadChar` 和 `checkMasteredChar` 都通过 `Object.assign` 调它。详见上方"V2.3 新增工具"章节。
+
+### dailyQuotaReached 残留（V2.3 修复 3）
+
+**现象**：新字学习模式学完触发"今日新字已达标"卡片后，从已掌握点其他字进入，卡片仍残留。
+
+**根因**：之前把 `dailyQuotaReached / dailyQuotaReason` 留在 `loadChar` 私有重置里，`checkMasteredChar` 没重置。
+
+**修复**：归到公共 `resetLearnStateMachine()`。
+
+### getStats 走降级路径返回老数据（V2.3 修复 4）
+
+**现象**：迁移后的用户首页"已掌握"显示 9，进入列表页只显示 1。
+
+**根因**：`db.collection().where({...}).count()` 配合 `_.in([...])` 抛异常，触发降级逻辑，用 `mastered_chars` 数组长度（旧数据）兜底返回 9。
+
+**修复**：`getStats` 改用 `.where().get().length`（去重后算 unique char_id 数），不用 `.count()`。
+
 ## 开发约定
 
 1. **ES5 语法**：对象回调用 `key: function(){}` 不用 `key(){}`，`var self = this` 模式，避免 `.bind()` 链式调用
 2. **openid 识别用户**：微信云开发通过 openid 标识用户
-3. **云函数统一入口**：main 云函数处理所有业务逻辑（14个action），login 独立处理 openid 获取
+3. **云函数统一入口**：main 云函数处理所有业务逻辑（**22 个 action**，V2.3），login 独立处理 openid 获取
 4. **奖励后端控制**：云函数返回奖励结果，前端展示
 5. **数据去重**：成就解锁使用幂等检查
 6. **集合命名**：成就记录集合名为 `achievement_log`（无s）
-7. **跨比对一致性**：首页统计和列表页统计使用相同的交叉比对逻辑
+7. **跨比对一致性**：首页统计和列表页统计使用相同的 `learning_progress` 查询条件（V2.3 起统一源）
+8. **切字必重置**：learn / review 等页面切字时**必须**调 `resetLearnStateMachine()`（或在 review 的 `showCurrentQuestion` 写完整重置 setData），避免上一个字的状态残留
+9. **密钥不进代码**：微信 AppSecret、百度 API Key/Secret 等敏感配置**必须**用云函数环境变量（`process.env`），代码里 `if (!xxx) throw new Error` 兜底，缺变量直接 fail 不静默
 
 ## 部署步骤
 
 1. 微信开发者工具导入项目，目录选择 `E:\claude\PMRD\shizi`，appid: `wxa2bbfca6b9ef6ebd`
-2. 开通云开发环境（环境ID: `cloud1-d7geippqn581097e3`）
-3. 上传云函数：右键 `cloudfunctions/main` 目录 →「上传并部署：云端安装依赖」
-4. 预览测试
+2. 开通云开发环境（环境 ID：`cloud1-d7geippqn581097e3`）
+3. **配置云函数环境变量**（V2.3 起必需）：
+   - 微信云开发控制台 → 云函数 → `main` → 配置 → 环境变量
+   - 添加 4 个：`WX_APPID` / `WX_APPSECRET` / `BAIDU_API_KEY` / `BAIDU_SECRET_KEY`
+   - WX_APPID 用 `wxa2bbfca6b9ef6ebd`（公开）
+   - 其余 3 个从对应平台后台拿，**绝对不能用代码里那串老密钥**（git 历史已泄露，视为废）
+4. 上传云函数：右键 `cloudfunctions/main` →「上传并部署：云端安装依赖」
+5. 预览测试
+
+## ⚠️ 安全注意事项
+
+- **密钥硬编码事故（V2.3 之前）**：老代码 `cloudfunctions/main/index.js` 行 9-14 把 `WX_APPSECRET` / `BAIDU_API_KEY` / `BAIDU_SECRET_KEY` 写在 `const` 里，且已 push 到 origin 公开分支 `feature/v2.1-asr-fallback`。
+- **已做止血**：V2.3 起改用 `process.env`，启动时校验。
+- **仍需用户做**：去微信公众平台/百度智能云后台**重置对应密钥**，并在云开发控制台配新值。老密钥视为已泄露。
+- **未来部署前**：若看到 `if (!process.env.XXX) throw` 风格的代码，新部署必须先配环境变量，否则会启动失败。
 
 ## 登录流程
 
