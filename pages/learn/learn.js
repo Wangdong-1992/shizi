@@ -3,6 +3,9 @@
 var app = getApp();
 var Delight = require('../../utils/delight.js');
 var StrokeData = require('../../utils/stroke-data.js');
+var ProgHint = require('../../utils/progressive-hint.js');
+var ErrClassifier = require('../../utils/error-classifier.js');
+var TTS = require('../../utils/audio.js');
 
 // 录音管理器
 var recorderManager = null;
@@ -50,6 +53,33 @@ Page({
     finalResult: null,
     charProgress: null,        // 学习进度
 
+    // ==================== V2.3 小复习 ====================
+    learnedBatch: [],              // 本批次已学汉字 [{char, pinyin, charId}]
+    miniReviewActive: false,       // 是否在小复习模式
+    miniReviewIndex: 0,            // 当前复习第几个字 (0-based)
+    miniReviewChars: [],           // 待复习字列表
+    miniReviewOptions: [],         // 当前题目选项
+    miniReviewAnswered: false,
+    miniReviewCorrect: false,
+    miniReviewSelectedId: '',
+    miniReviewResults: [],         // [{charId, char, correct}]
+    miniReviewCompleted: false,
+    miniReviewSummary: null,       // {total, correct, wrong}
+    BATCH_SIZE: 3,                 // 每批次学3个字触发小复习
+
+    // ==================== R-13: 每日学习量控制 ====================
+    dailyQuotaReached: false,      // 是否达到每日新字上限
+    dailyQuotaReason: '',          // 超限原因文案
+    dailyNewLearned: 0,            // 今日已学新字数
+    dailyNewLimit: 5,              // 今日新字上限
+    pendingReview: 0,              // 待复习数
+
+    // ==================== V2.3 渐进式错误提示 ====================
+    charErrorCount: 0,             // 当前字连续答错次数
+    showProgressiveHint: false,    // 是否显示渐进提示
+    progressiveHintText: '',       // 提示文本
+    progressiveHintLevel: 0,       // 1/2/3
+
     // ==================== 动画状态 ====================
     cardEntrance: false,
     shaking: false,
@@ -89,6 +119,13 @@ Page({
   },
 
   onShow: function() {
+    // 优先消费从 mastered 页面传来的字 ——
+    // learn 是 tabBar 页面,二次进入时 onLoad 不会再触发,
+    // 必须靠 onShow 消费 fromMasteredChar,否则会一直显示上一次的 currentChar
+    if (app.globalData.fromMasteredChar) {
+      this.checkMasteredChar();
+      return;
+    }
     if (!this.data.currentChar && !this.data.loading) {
       this.checkMasteredChar();
     }
@@ -126,18 +163,66 @@ Page({
     var masteredChar = app.globalData.fromMasteredChar;
     if (masteredChar) {
       app.globalData.fromMasteredChar = null;
-      this.setData({
+      this.setData(Object.assign({
+        // 字本身
         currentChar: masteredChar.char,
         charId: masteredChar.charId,
         pinyin: masteredChar.pinyin,
         fromMastered: true,
         loading: false
-      });
+      }, this.resetLearnStateMachine()));
       this.loadCharProgress();
       this.triggerEntrance();
     } else if (!this.data.currentChar) {
       this.loadChar();
     }
+  },
+
+  /**
+   * 重置四步递进学习状态机(切字前调用)
+   * 抽出来供 loadChar / checkMasteredChar 共用,避免状态字段遗漏
+   * 以后新增"切字时需要清零"的字段,只在这里加一次即可
+   * 注:loading 由调用方自己设(loadChar=true, checkMasteredChar=false)
+   */
+  resetLearnStateMachine: function() {
+    return {
+      // 四步状态机本体
+      currentStep: 1,
+      stepCompleted: [false, false, false, false],
+      stepResults: [{}, {}, {}, {}],
+      learnCompleted: false,
+      finalResult: null,
+      feedbackShow: false,
+      // Step2 再认
+      step2Options: [],
+      step2Answered: false,
+      step2Correct: false,
+      step2SelectedId: '',
+      // Step3 描红
+      strokePaths: [],
+      strokeIndex: 0,
+      strokeCompleted: false,
+      hasStrokeData: false,
+      totalStrokes: 0,
+      strokeDeviation: false,
+      // Step4 跟读
+      step4Correct: false,
+      step4Answered: false,
+      asrFailed: false,
+      asrProcessing: false,
+      showChoiceMode: false,
+      choiceOptions: [],
+      // V2.3 渐进提示
+      charErrorCount: 0,
+      showProgressiveHint: false,
+      progressiveHintText: '',
+      progressiveHintLevel: 0,
+      // R-13 每日新字配额 ——
+      // 之前漏在 reset 外面,导致已掌握→新字切换时"今日新字已达标"卡片残留
+      // (R-13 卡片只在新字模式下出现,所以切到任何字都重置为 false)
+      dailyQuotaReached: false,
+      dailyQuotaReason: ''
+    };
   },
 
   initRecorder: function() {
@@ -164,31 +249,71 @@ Page({
    */
   loadChar: function() {
     var self = this;
-    self.setData({
+    // 状态机重置走公共方法,自身只覆盖 loadChar 特有的字段(loading=true、charProgress=null、cardEntrance 立即重置用于动画)
+    self.setData(Object.assign({
       loading: true,
-      feedbackShow: false,
       cardEntrance: false,
-      asrFailed: false,
-      showChoiceMode: false,
-      currentStep: 1,
-      stepCompleted: [false, false, false, false],
-      stepResults: [{}, {}, {}, {}],
-      step2Options: [],
-      step2Answered: false,
-      step2Correct: false,
-      step2SelectedId: '',
-      strokePaths: [],
-      strokeIndex: 0,
-      strokeCompleted: false,
-      learnCompleted: false,
-      finalResult: null,
-      charProgress: null,
-      step4Correct: false,
-      step4Answered: false,
-      hasStrokeData: false,
-      totalStrokes: 0,
-      strokeDeviation: false
+      charProgress: null
+    }, self.resetLearnStateMachine()));
+
+    // 如果是新一轮学习（非小复习触发），重置批次
+    if (!self.data.miniReviewActive) {
+      self.setData({
+        learnedBatch: [],
+        miniReviewActive: false,
+        miniReviewIndex: 0,
+        miniReviewChars: [],
+        miniReviewOptions: [],
+        miniReviewAnswered: false,
+        miniReviewCorrect: false,
+        miniReviewSelectedId: '',
+        miniReviewResults: [],
+        miniReviewCompleted: false,
+        miniReviewSummary: null
+      });
+    }
+
+    // R-13: 先查每日配额
+    wx.cloud.callFunction({
+      name: 'main',
+      data: {
+        action: 'getDailyStats',
+        data: { openid: app.globalData.openid || 'guest' }
+      },
+      success: function(statsRes) {
+        if (statsRes.result && statsRes.result.success && statsRes.result.data) {
+          var stats = statsRes.result.data;
+          self.setData({
+            dailyNewLearned: stats.dailyNewLearned || 0,
+            dailyNewLimit: stats.dailyNewLimit || 5,
+            pendingReview: stats.pendingReview || 0
+          });
+
+          if (!stats.canLearnNew) {
+            // 配额用完 → 显示引导卡片
+            self.setData({
+              dailyQuotaReached: true,
+              dailyQuotaReason: stats.reason || '今日新字已学完',
+              loading: false
+            });
+            return;
+          }
+        }
+        // 配额OK → 正常加载新字
+        self._doLoadChar();
+      },
+      fail: function() {
+        // 查询失败不阻塞学习
+        self._doLoadChar();
+      }
     });
+  },
+
+  /**
+   * R-13: 实际执行加载新字（配额检查通过后调用）
+   */
+  _doLoadChar: function() {
+    var self = this;
 
     wx.cloud.callFunction({
       name: 'main',
@@ -209,10 +334,15 @@ Page({
           self.loadCharProgress();
           self.triggerEntrance();
         } else {
-          self.setData({
-            tipMessage: '🎉 太棒了，已经学完所有汉字！',
-            loading: false
-          });
+          // 无更多字可学，检查是否有待复习的批次
+          if (self.data.learnedBatch.length > 0) {
+            self.initMiniReview();
+          } else {
+            self.setData({
+              tipMessage: '🎉 太棒了，已经学完所有汉字！',
+              loading: false
+            });
+          }
         }
       },
       fail: function(err) {
@@ -263,29 +393,9 @@ Page({
 
     self.showFeedback('info', '🔊', '播放发音中...');
 
-    wx.cloud.callFunction({
-      name: 'main',
-      data: {
-        action: 'getAudio',
-        data: { char: char, pinyin: pinyin }
-      },
-      success: function(res) {
-        if (res.result && res.result.success && res.result.audioUrl) {
-          var audio = wx.createInnerAudioContext();
-          audio.src = res.result.audioUrl;
-          audio.play();
-          audio.onError(function(err) {
-            console.error('音频播放错误:', err);
-            self.showFeedback('info', '📖', pinyin);
-          });
-        } else {
-          self.showFeedback('info', '📖', pinyin);
-        }
-      },
-      fail: function(err) {
-        console.error('getAudio fail:', err);
-        self.showFeedback('info', '📖', pinyin);
-      }
+    // 走 utils/audio.js 的重试逻辑(getAudio 内部 token 偶尔失效)
+    TTS.playTTS(char, pinyin, function() {
+      self.showFeedback('info', '📖', pinyin);
     });
   },
 
@@ -359,19 +469,31 @@ Page({
       step2Options: [],
       step2Answered: false,
       step2Correct: false,
-      step2SelectedId: ''
+      step2SelectedId: '',
+      charErrorCount: 0,
+      showProgressiveHint: false,
+      progressiveHintText: '',
+      progressiveHintLevel: 0
     });
+
+    // R-16fix: 查询形近字列表，优先作为视觉辨认干扰项
+    var shapeSimilar = [];
+    try {
+      var currentChar = self.data.currentChar;
+      if (currentChar && ErrClassifier.SHAPE_SIMILAR_MAP && ErrClassifier.SHAPE_SIMILAR_MAP[currentChar]) {
+        shapeSimilar = ErrClassifier.SHAPE_SIMILAR_MAP[currentChar];
+      }
+    } catch (e) {}
 
     wx.cloud.callFunction({
       name: 'main',
       data: {
         action: 'getOptions',
-        data: { charId: self.data.charId }
+        data: { charId: self.data.charId, shapeSimilar: shapeSimilar }
       },
       success: function(res) {
         if (res.result && res.result.success && res.result.data && res.result.data.options) {
-          // 只取前3个选项
-          var opts = res.result.data.options.slice(0, 3);
+          var opts = res.result.data.options;
           self.setData({ step2Options: opts });
         } else {
           // getOptions 失败，跳过此步骤
@@ -428,46 +550,114 @@ Page({
       }
     }
 
-    self.setData({
-      step2Answered: true,
-      step2Correct: isCorrect,
-      step2SelectedId: selectedId
-    });
-
-    // 记录步骤结果
-    var stepResults = self.data.stepResults.slice();
-    stepResults[1] = {
-      completed: true,
-      correct: isCorrect,
-      selectedId: selectedId,
-      timestamp: Date.now()
-    };
-
-    var stepCompleted = self.data.stepCompleted.slice();
-    stepCompleted[1] = true;
-
-    self.setData({
-      stepCompleted: stepCompleted,
-      stepResults: stepResults
-    });
-
-    // 反馈
     if (isCorrect) {
+      // 答对 → 正常完成
+      var stepResults = self.data.stepResults.slice();
+      stepResults[1] = {
+        completed: true,
+        correct: true,
+        selectedId: selectedId,
+        timestamp: Date.now()
+      };
+
+      var stepCompleted = self.data.stepCompleted.slice();
+      stepCompleted[1] = true;
+
+      self.setData({
+        step2Answered: true,
+        step2Correct: true,
+        step2SelectedId: selectedId,
+        stepCompleted: stepCompleted,
+        stepResults: stepResults,
+        charErrorCount: 0,
+        showProgressiveHint: false,
+        progressiveHintText: '',
+        progressiveHintLevel: 0
+      });
+
       try { Delight.playSound('success'); } catch (e) {}
       try { Delight.vibrate('medium'); } catch (e) {}
       Delight.burstStars(self, 5, 1000);
       self.showFeedback('success', '✅', '认对了！真棒！');
+
+      setTimeout(function() {
+        self.goToStep(3);
+      }, 2000);
     } else {
+      // 答错 → 渐进提示 + 重试
+      var errorCount = self.data.charErrorCount + 1;
+      var hintText = ProgHint.getProgressiveHint(
+        self.data.currentChar,
+        self.data.pinyin,
+        errorCount
+      );
+
+      self.setData({
+        step2SelectedId: selectedId,
+        charErrorCount: errorCount,
+        showProgressiveHint: true,
+        progressiveHintText: hintText,
+        progressiveHintLevel: Math.min(errorCount, 3)
+      });
+
       try { Delight.playSound('wrong'); } catch (e) {}
       try { Delight.vibrate('light'); } catch (e) {}
       Delight.shake(self, 'shaking');
-      self.showFeedback('error', '💪', '没关系，记住它！');
-    }
 
-    // 3秒后自动进入下一步
-    setTimeout(function() {
-      self.goToStep(3);
-    }, 2000);
+      if (errorCount >= 3) {
+        // 3次全错 → 强行通过 + 错因分类
+        var selectedOption = null;
+        for (var j = 0; j < options.length; j++) {
+          if (String(options[j].id) === String(selectedId)) {
+            selectedOption = options[j];
+            break;
+          }
+        }
+        var classification = ErrClassifier.classifyError(
+          self.data.currentChar,
+          self.data.pinyin,
+          selectedOption ? selectedOption.char : '',
+          selectedOption ? (selectedOption.pinyin || '') : ''
+        );
+
+        var stepResults3 = self.data.stepResults.slice();
+        stepResults3[1] = {
+          completed: true,
+          correct: false,
+          selectedId: selectedId,
+          retryCount: errorCount,
+          errorType: classification.errorType,
+          errorSimilarChar: classification.similarChar,
+          timestamp: Date.now()
+        };
+
+        var stepCompleted3 = self.data.stepCompleted.slice();
+        stepCompleted3[1] = true;
+
+        self.setData({
+          step2Answered: true,
+          step2Correct: false,
+          stepCompleted: stepCompleted3,
+          stepResults: stepResults3
+        });
+
+        var feedbackMsg = '正确答案：' + self.data.currentChar + '（' + self.data.pinyin + '）\n' + ErrClassifier.getReinforcementHint(classification.errorType, classification.similarChar);
+        self.showFeedback('error', '💪', feedbackMsg);
+
+        setTimeout(function() {
+          self.goToStep(3);
+        }, 2500);
+      } else {
+        // 还在重试中 → 短暂显示提示后清除选中状态，允许重选
+        self.showFeedback('info', '💡', hintText);
+        setTimeout(function() {
+          self.setData({
+            step2SelectedId: '',
+            feedbackShow: false
+          });
+        }, 2000);
+      }
+    }
   },
 
   // ==================== Step3: 描红 ====================
@@ -521,10 +711,12 @@ Page({
 
   /**
    * 绘制当前笔画的引导线
-   * 在 canvas 上绘制所有已完成笔画（灰色实线）+ 当前笔画引导（灰色虚线）
+   * 在 canvas 上绘制所有已完成笔画（灰色实线）+ 当前笔画引导
+   * @param {string} guideColor - 引导线颜色，默认 '#4A90D9'（蓝色），偏离时 '#f44336'（红色）
    */
-  drawStrokeGuide: function() {
+  drawStrokeGuide: function(guideColor) {
     var self = this;
+    var color = guideColor || '#4A90D9';
     var query = wx.createSelectorQuery();
     query.select('#strokeCanvas').fields({ node: true, size: true }).exec(function(res) {
       if (!res || !res[0] || !res[0].node) {
@@ -564,9 +756,9 @@ Page({
         self.drawStrokePath(ctx, strokePaths[i], scaleX, scaleY, '#999999', 3, false);
       }
 
-      // 绘制当前笔画引导（灰色虚线）
+      // 绘制当前笔画引导
       if (strokeIndex < strokePaths.length) {
-        self.drawStrokePath(ctx, strokePaths[strokeIndex], scaleX, scaleY, '#4A90D9', 4, true);
+        self.drawStrokePath(ctx, strokePaths[strokeIndex], scaleX, scaleY, color, 4, true);
       }
 
       // 保存 canvas 引用供后续触摸绘制使用
@@ -632,6 +824,7 @@ Page({
     var self = this;
     if (self.data.strokeCompleted) return;
     if (!self.data.hasStrokeData) return;
+    if (!self._canvasCtx) return;
 
     var touch = e.touches[0];
     var x = touch.x;
@@ -826,48 +1019,14 @@ Page({
    * 偏离时重新绘制引导线（红色警告）
    */
   redrawGuideWithWarning: function() {
-    var self = this;
-    if (!self._canvasCtx) return;
-
-    var strokePaths = self.data.strokePaths;
-    var strokeIndex = self.data.strokeIndex;
-
-    if (strokeIndex >= strokePaths.length) return;
-
-    // 重绘当前笔画引导线为红色
-    self.drawStrokePath(
-      self._canvasCtx,
-      strokePaths[strokeIndex],
-      self._scaleX,
-      self._scaleY,
-      '#f44336',
-      4,
-      true
-    );
+    this.drawStrokeGuide('#f44336');
   },
 
   /**
    * 恢复蓝色引导线
    */
   redrawGuideNormal: function() {
-    var self = this;
-    if (!self._canvasCtx) return;
-
-    var strokePaths = self.data.strokePaths;
-    var strokeIndex = self.data.strokeIndex;
-
-    if (strokeIndex >= strokePaths.length) return;
-
-    // 重绘当前笔画引导线为蓝色
-    self.drawStrokePath(
-      self._canvasCtx,
-      strokePaths[strokeIndex],
-      self._scaleX,
-      self._scaleY,
-      '#4A90D9',
-      4,
-      true
-    );
+    this.drawStrokeGuide('#4A90D9');
   },
 
   /**
@@ -933,7 +1092,11 @@ Page({
       showChoiceMode: false,
       choiceOptions: [],
       step4Correct: false,
-      step4Answered: false
+      step4Answered: false,
+      charErrorCount: 0,
+      showProgressiveHint: false,
+      progressiveHintText: '',
+      progressiveHintLevel: 0
     });
   },
 
@@ -1132,39 +1295,110 @@ Page({
       }
     }
 
-    self.setData({ showChoiceMode: false });
-
-    var stepResults = self.data.stepResults.slice();
-    stepResults[3] = {
-      completed: true,
-      correct: isCorrect,
-      isAssisted: true,
-      score: isCorrect ? 1.0 : 0,
-      timestamp: Date.now()
-    };
-
-    var stepCompleted = self.data.stepCompleted.slice();
-    stepCompleted[3] = true;
-
-    self.setData({
-      stepCompleted: stepCompleted,
-      stepResults: stepResults,
-      step4Answered: true,
-      step4Correct: isCorrect
-    });
-
     if (isCorrect) {
+      // 答对 → 完成
+      var stepResults = self.data.stepResults.slice();
+      stepResults[3] = {
+        completed: true,
+        correct: true,
+        isAssisted: true,
+        score: 1.0,
+        timestamp: Date.now()
+      };
+
+      var stepCompleted = self.data.stepCompleted.slice();
+      stepCompleted[3] = true;
+
+      self.setData({
+        showChoiceMode: false,
+        stepCompleted: stepCompleted,
+        stepResults: stepResults,
+        step4Answered: true,
+        step4Correct: true,
+        charErrorCount: 0,
+        showProgressiveHint: false,
+        progressiveHintText: '',
+        progressiveHintLevel: 0
+      });
+
       try { Delight.vibrate('medium'); } catch (e) {}
       Delight.burstStars(self, 5, 1000);
       self.showFeedback('success', '👍', '选对了！继续加油！');
-    } else {
-      try { Delight.vibrate('light'); } catch (e) {}
-      self.showFeedback('error', '💪', Delight.getEncourage());
-    }
 
-    setTimeout(function() {
-      self.submitLearnResult();
-    }, 2000);
+      setTimeout(function() {
+        self.submitLearnResult();
+      }, 2000);
+    } else {
+      // 答错 → 渐进提示 + 重试
+      var errorCount = self.data.charErrorCount + 1;
+      var hintText = ProgHint.getProgressiveHint(
+        self.data.currentChar,
+        self.data.pinyin,
+        errorCount
+      );
+
+      self.setData({
+        charErrorCount: errorCount,
+        showProgressiveHint: true,
+        progressiveHintText: hintText,
+        progressiveHintLevel: Math.min(errorCount, 3)
+      });
+
+      try { Delight.vibrate('light'); } catch (e) {}
+
+      if (errorCount >= 3) {
+        // 3次全错 → 强行通过 + 错因分类
+        var selectedOption4 = null;
+        for (var j3 = 0; j3 < options.length; j3++) {
+          if (String(options[j3].id) === String(selectedId)) {
+            selectedOption4 = options[j3];
+            break;
+          }
+        }
+        var classification4 = ErrClassifier.classifyError(
+          self.data.currentChar,
+          self.data.pinyin,
+          selectedOption4 ? selectedOption4.char : '',
+          selectedOption4 ? (selectedOption4.pinyin || '') : ''
+        );
+
+        var stepResults3 = self.data.stepResults.slice();
+        stepResults3[3] = {
+          completed: true,
+          correct: false,
+          isAssisted: true,
+          score: 0,
+          retryCount: errorCount,
+          errorType: classification4.errorType,
+          errorSimilarChar: classification4.similarChar,
+          timestamp: Date.now()
+        };
+
+        var stepCompleted3 = self.data.stepCompleted.slice();
+        stepCompleted3[3] = true;
+
+        self.setData({
+          showChoiceMode: false,
+          stepCompleted: stepCompleted3,
+          stepResults: stepResults3,
+          step4Answered: true,
+          step4Correct: false
+        });
+
+        var feedbackMsg4 = '正确答案：' + self.data.currentChar + '（' + self.data.pinyin + '）\n' + ErrClassifier.getReinforcementHint(classification4.errorType, classification4.similarChar);
+        self.showFeedback('error', '💪', feedbackMsg4);
+
+        setTimeout(function() {
+          self.submitLearnResult();
+        }, 2500);
+      } else {
+        // 重试 → 显示提示，清除选中状态
+        self.showFeedback('info', '💡', hintText);
+        setTimeout(function() {
+          self.setData({ feedbackShow: false });
+        }, 2000);
+      }
+    }
   },
 
   /**
@@ -1281,6 +1515,16 @@ Page({
       exerciseType = 'recall';
     }
 
+    // 提取错因分类
+    var errorType = null;
+    if (!overallCorrect) {
+      if (stepResults[3] && stepResults[3].errorType) {
+        errorType = stepResults[3].errorType;
+      } else if (stepResults[1] && stepResults[1].errorType) {
+        errorType = stepResults[1].errorType;
+      }
+    }
+
     wx.cloud.callFunction({
       name: 'main',
       data: {
@@ -1292,7 +1536,8 @@ Page({
           isCorrect: overallCorrect,
           isAssisted: isAssisted,
           asrScore: asrScore,
-          exerciseType: exerciseType
+          exerciseType: exerciseType,
+          errorType: errorType
         }
       },
       success: function(res) {
@@ -1303,18 +1548,17 @@ Page({
       }
     });
 
-    // 3. 延迟后导航
+    // 3. 将当前字加入批次，检查是否触发小复习
     setTimeout(function() {
       if (self.data.fromMastered) {
+        // 从已掌握页面进入，不加入批次
         wx.navigateBack();
       } else {
-        self.setData({
-          cardEntrance: false,
-          feedbackShow: false,
-          learnCompleted: false,
-          finalResult: null
+        self.addToBatch({
+          char: self.data.currentChar,
+          pinyin: self.data.pinyin,
+          charId: self.data.charId
         });
-        self.loadChar();
       }
     }, 2800);
   },
@@ -1357,6 +1601,391 @@ Page({
     var distY = py - projY;
 
     return Math.sqrt(distX * distX + distY * distY);
+  },
+
+  // ==================== 兼容方法 ====================
+
+  // ==================== V2.3 小复习 ====================
+
+  /**
+   * 将学完的字加入批次
+   * @param {Object} charData {char, pinyin, charId}
+   */
+  addToBatch: function(charData) {
+    var self = this;
+    var batch = self.data.learnedBatch.slice();
+    batch.push(charData);
+
+    self.setData({
+      learnedBatch: batch,
+      cardEntrance: false,
+      feedbackShow: false,
+      learnCompleted: false,
+      finalResult: null
+    });
+
+    if (batch.length >= self.data.BATCH_SIZE) {
+      // 批次满，触发小复习
+      self.initMiniReview();
+    } else {
+      // 继续学下一个字
+      self.loadChar();
+    }
+  },
+
+  /**
+   * 初始化小复习
+   * 进入小复习模式，从批次第一个字开始
+   */
+  initMiniReview: function() {
+    var self = this;
+    var batch = self.data.learnedBatch.slice();
+
+    self.setData({
+      miniReviewActive: true,
+      miniReviewIndex: 0,
+      miniReviewChars: batch,
+      miniReviewResults: [],
+      miniReviewCompleted: false,
+      miniReviewSummary: null,
+      // 隐藏四步进度条
+      currentStep: 0,
+      learnCompleted: false,
+      finalResult: null,
+      feedbackShow: false
+    });
+
+    self.loadMiniReviewQuestion();
+  },
+
+  /**
+   * 加载当前字的3选1选项
+   */
+  loadMiniReviewQuestion: function() {
+    var self = this;
+    var index = self.data.miniReviewIndex;
+    var chars = self.data.miniReviewChars;
+
+    if (index >= chars.length) {
+      self.finishMiniReview();
+      return;
+    }
+
+    self.setData({
+      miniReviewOptions: [],
+      miniReviewAnswered: false,
+      miniReviewCorrect: false,
+      miniReviewSelectedId: '',
+      charErrorCount: 0,
+      showProgressiveHint: false,
+      progressiveHintText: '',
+      progressiveHintLevel: 0
+    });
+
+    var currentChar = chars[index];
+
+    wx.cloud.callFunction({
+      name: 'main',
+      data: {
+        action: 'getOptions',
+        data: { charId: currentChar.charId }
+      },
+      success: function(res) {
+        if (res.result && res.result.success && res.result.data && res.result.data.options) {
+          var opts = res.result.data.options.slice(0, 3);
+          self.setData({ miniReviewOptions: opts });
+          // 自动播放发音
+          self.playMiniReviewAudio();
+        } else {
+          // 选项加载失败，跳过该字
+          self.recordMiniReviewResult(currentChar.charId, currentChar.char, false, true);
+          setTimeout(function() {
+            self.nextMiniReviewChar();
+          }, 1000);
+        }
+      },
+      fail: function(err) {
+        console.error('小复习getOptions失败:', err);
+        self.recordMiniReviewResult(currentChar.charId, currentChar.char, false, true);
+        setTimeout(function() {
+          self.nextMiniReviewChar();
+        }, 1000);
+      }
+    });
+  },
+
+  /**
+   * 小复习中播放发音
+   */
+  playMiniReviewAudio: function() {
+    var self = this;
+    var index = self.data.miniReviewIndex;
+    var chars = self.data.miniReviewChars;
+    if (index >= chars.length) return;
+
+    var currentChar = chars[index];
+
+    // 走 utils/audio.js 的重试逻辑
+    TTS.playTTS(currentChar.char, currentChar.pinyin, function() {
+      console.error('小复习音频播放失败');
+    });
+  },
+
+  /**
+   * 小复习选择选项
+   */
+  onMiniReviewSelect: function(e) {
+    var self = this;
+    if (self.data.miniReviewAnswered) return;
+
+    var selectedId = e.currentTarget.dataset.id;
+    var options = self.data.miniReviewOptions;
+    var isCorrect = false;
+
+    for (var i = 0; i < options.length; i++) {
+      if (String(options[i].id) === String(selectedId) && options[i].isCorrect) {
+        isCorrect = true;
+        break;
+      }
+    }
+
+    if (isCorrect) {
+      // 答对 → 记录结果，下一题
+      self.setData({
+        miniReviewAnswered: true,
+        miniReviewCorrect: true,
+        miniReviewSelectedId: selectedId,
+        charErrorCount: 0,
+        showProgressiveHint: false,
+        progressiveHintText: '',
+        progressiveHintLevel: 0
+      });
+
+      try { Delight.playSound('success'); } catch (e) {}
+      try { Delight.vibrate('medium'); } catch (e) {}
+      Delight.burstStars(self, 3, 600);
+
+      var index = self.data.miniReviewIndex;
+      var chars = self.data.miniReviewChars;
+      if (index < chars.length) {
+        self.recordMiniReviewResult(chars[index].charId, chars[index].char, true, false);
+      }
+
+      setTimeout(function() {
+        self.nextMiniReviewChar();
+      }, 1500);
+    } else {
+      // 答错 → 渐进提示 + 重试
+      var errorCount = self.data.charErrorCount + 1;
+      var currentCharData = self.data.miniReviewChars[self.data.miniReviewIndex];
+      var hintText = ProgHint.getProgressiveHint(
+        currentCharData ? currentCharData.char : '',
+        currentCharData ? currentCharData.pinyin : '',
+        errorCount
+      );
+
+      self.setData({
+        miniReviewSelectedId: selectedId,
+        charErrorCount: errorCount,
+        showProgressiveHint: true,
+        progressiveHintText: hintText,
+        progressiveHintLevel: Math.min(errorCount, 3)
+      });
+
+      try { Delight.playSound('wrong'); } catch (e) {}
+      try { Delight.vibrate('light'); } catch (e) {}
+
+      if (errorCount >= 3) {
+        // 3次全错 → 标记错误 + 错因分类
+        var index3 = self.data.miniReviewIndex;
+        var chars3 = self.data.miniReviewChars;
+        var selectedOpt3 = null;
+        var miniOpts = self.data.miniReviewOptions;
+        for (var k = 0; k < miniOpts.length; k++) {
+          if (String(miniOpts[k].id) === String(selectedId)) {
+            selectedOpt3 = miniOpts[k];
+            break;
+          }
+        }
+        var clMini = ErrClassifier.classifyError(
+          currentCharData ? currentCharData.char : '',
+          currentCharData ? currentCharData.pinyin : '',
+          selectedOpt3 ? selectedOpt3.char : '',
+          selectedOpt3 ? (selectedOpt3.pinyin || '') : ''
+        );
+        if (index3 < chars3.length) {
+          self.recordMiniReviewResult(chars3[index3].charId, chars3[index3].char, false, false, clMini.errorType, clMini.similarChar);
+        }
+
+        self.setData({ miniReviewAnswered: true, miniReviewCorrect: false });
+        var fbMsgMini = '正确答案：' + (currentCharData ? currentCharData.char + '（' + currentCharData.pinyin + '）' : '') + '\n' + ErrClassifier.getReinforcementHint(clMini.errorType, clMini.similarChar);
+        self.showFeedback('error', '💪', fbMsgMini);
+
+        setTimeout(function() {
+          self.nextMiniReviewChar();
+        }, 2000);
+      } else {
+        // 重试 → 显示提示，清除选中
+        self.showFeedback('info', '💡', hintText);
+        setTimeout(function() {
+          self.setData({
+            miniReviewSelectedId: '',
+            feedbackShow: false
+          });
+        }, 2000);
+      }
+    }
+  },
+
+  /**
+   * 记录小复习单字结果
+   * @param {string} charId
+   * @param {string} char
+   * @param {boolean} correct
+   * @param {boolean} skipped 是否因加载失败跳过
+   */
+  recordMiniReviewResult: function(charId, char, correct, skipped, errorType, errorSimilarChar) {
+    var results = this.data.miniReviewResults.slice();
+    results.push({
+      charId: charId,
+      char: char,
+      correct: correct,
+      skipped: !!skipped,
+      errorType: errorType || null,
+      errorSimilarChar: errorSimilarChar || ''
+    });
+    this.setData({ miniReviewResults: results });
+  },
+
+  /**
+   * 进入下一个字的复习
+   */
+  nextMiniReviewChar: function() {
+    var self = this;
+    var nextIndex = self.data.miniReviewIndex + 1;
+
+    if (nextIndex >= self.data.miniReviewChars.length) {
+      self.finishMiniReview();
+    } else {
+      self.setData({
+        miniReviewIndex: nextIndex,
+        miniReviewOptions: [],
+        miniReviewAnswered: false,
+        miniReviewCorrect: false,
+        miniReviewSelectedId: ''
+      });
+      self.loadMiniReviewQuestion();
+    }
+  },
+
+  /**
+   * 完成小复习，展示结果摘要
+   */
+  finishMiniReview: function() {
+    var self = this;
+    var results = self.data.miniReviewResults;
+    var total = results.length;
+    var correct = 0;
+
+    for (var i = 0; i < results.length; i++) {
+      if (results[i].correct) correct++;
+    }
+    var wrong = total - correct;
+
+    self.setData({
+      miniReviewCompleted: true,
+      miniReviewSummary: {
+        total: total,
+        correct: correct,
+        wrong: wrong
+      }
+    });
+
+    // 提交结果到云函数
+    self.submitMiniReviewResults();
+
+    // 全部正确 → 庆祝
+    if (correct === total && total > 0) {
+      Delight.burstStars(self, 10, 1200);
+      setTimeout(function() {
+        Delight.burstConfetti(self, 2000);
+      }, 300);
+      try { Delight.playSound('success'); } catch (e) {}
+    }
+  },
+
+  /**
+   * 提交小复习结果到云函数
+   * 每个字调用 recordReview，答错的字 Box 自动降级
+   */
+  submitMiniReviewResults: function() {
+    var self = this;
+    var results = self.data.miniReviewResults;
+    var openid = app.globalData.openid || 'guest';
+
+    for (var i = 0; i < results.length; i++) {
+      var r = results[i];
+      if (r.skipped) continue; // 跳过加载失败的字
+
+      wx.cloud.callFunction({
+        name: 'main',
+        data: {
+          action: 'recordReview',
+          data: {
+            openid: openid,
+            charId: r.charId,
+            reviewMode: 'mini_review',
+            isCorrect: r.correct,
+            isAssisted: false,
+            asrScore: null,
+            exerciseType: 'recognition',
+            errorType: r.errorType || null
+          }
+        },
+        success: function(res) {
+          console.log('小复习recordReview:', JSON.stringify(res.result));
+        },
+        fail: function(err) {
+          console.error('小复习recordReview失败:', err);
+        }
+      });
+    }
+  },
+
+  /**
+   * 继续学习：清空批次，加载下一个字
+   */
+  continueLearning: function() {
+    var self = this;
+    self.setData({
+      learnedBatch: [],
+      miniReviewActive: false,
+      miniReviewIndex: 0,
+      miniReviewChars: [],
+      miniReviewOptions: [],
+      miniReviewAnswered: false,
+      miniReviewCorrect: false,
+      miniReviewSelectedId: '',
+      miniReviewResults: [],
+      miniReviewCompleted: false,
+      miniReviewSummary: null,
+      currentStep: 1,
+      stepCompleted: [false, false, false, false],
+      stepResults: [{}, {}, {}, {}]
+    });
+    self.loadChar();
+  },
+
+  /**
+   * 返回首页
+   */
+  goHome: function() {
+    wx.switchTab({ url: '/pages/index/index' });
+  },
+
+  // ==================== R-13: 去复习 ====================
+  goToReview: function() {
+    wx.navigateTo({ url: '/pages/review/review' });
   },
 
   // ==================== 兼容方法 ====================
