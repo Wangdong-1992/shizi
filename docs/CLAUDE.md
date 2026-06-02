@@ -309,6 +309,69 @@ this.setData(Object.assign({
 - **仍需用户做**：去微信公众平台/百度智能云后台**重置对应密钥**，并在云开发控制台配新值。老密钥视为已泄露。
 - **未来部署前**：若看到 `if (!process.env.XXX) throw` 风格的代码，新部署必须先配环境变量，否则会启动失败。
 
+## 🔧 云数据库索引（性能必需）
+
+**V2.3 P1 项**：随着用户量增长，下面的索引必需提前建好（在小用户量下也能提速）。**微信云开发不支持在代码里 createIndex**，必须**在云开发控制台手动建**。
+
+### 1. 控制台入口
+
+云开发控制台 → 数据库 → 选集合 → 索引管理 → 添加索引
+
+### 2. 需要建的索引
+
+#### 集合 `learning_progress`（最关键，影响所有复习链路）
+
+| 索引字段(组合) | 索引类型 | 用途 |
+|----------------|----------|------|
+| `{openid: 1, next_review_date: 1}` | 升序 | `getPendingReview` 按 openid 过滤 + 按 next_review_date 排序 |
+| `{openid: 1, status: 1}` | 升序 | `getStats`/`getMasteredChars` 按 openid+status 查"已掌握" |
+| `{openid: 1, char_id: 1}` | **唯一** | `recordLearn` / `recordReview` / `getLearnChar` 按 openid+char_id 查/upsert（必须唯一，避免重复记录） |
+| `{openid: 1, first_learn_date: 1}` | 升序 | `getDailyStats` 查"今日新学" |
+
+#### 集合 `review_logs`（影响 R-16 数据清洗和复习历史查询）
+
+| 索引字段(组合) | 索引类型 | 用途 |
+|----------------|----------|------|
+| `{openid: 1, reviewed_at: -1}` | 降序 | 个人复习历史时间序 |
+| `{data_quality: 1, reviewed_at: 1}` | 升序 | `cleanReviewLogs` 找未清洗的旧记录 |
+
+#### 集合 `users`（影响所有 action）
+
+| 索引字段(组合) | 索引类型 | 用途 |
+|----------------|----------|------|
+| `{openid: 1}` | **唯一** | 所有 action 的入口过滤（必须唯一） |
+| `{push_subscribed: 1}` | 升序 | `sendReviewReminder` 找订阅用户 |
+
+#### 集合 `achievement_log` / `reward_logs`
+
+| 索引字段(组合) | 索引类型 | 用途 |
+|----------------|----------|------|
+| `{openid: 1}` | 升序 | 个人成就/奖励查询 |
+
+### 3. 建索引步骤(以 `learning_progress` 为例)
+
+1. 控制台 → 数据库 → 选 `learning_progress` 集合
+2. 顶部标签 → "**索引管理**"
+3. 点 "**添加索引**"
+4. 填:
+   - 索引名:`openid_next_review_date_idx`
+   - 字段:`openid`(升序),`next_review_date`(升序)
+   - 是否唯一:**否**
+5. 确定 → 等待几秒建好
+6. 重复上述步骤建其他索引
+
+### 4. 验证索引生效
+
+云函数里加 `.explain()` 调(临时调试用):
+```js
+const explainRes = await db.collection('learning_progress')
+  .where({ openid, status: _.in(['familiar', 'mastered', 'solid']) })
+  .explain();
+console.log(JSON.stringify(explainRes));  // 看是否命中索引
+```
+
+**说明**：用户量小(<1000)时没索引也能跑,但有索引更稳。**建议尽快建**。
+
 ## 登录流程
 
 1. 用户打开小程序 → 显示登录卡片（tabbar隐藏）
