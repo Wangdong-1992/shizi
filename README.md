@@ -36,7 +36,9 @@
 │   ├── spaced-repetition.js # V2.2 间隔重复算法（Leitner Box + 状态机 + 优先级）
 │   └── stroke-data.js      # 笔顺路径数据（2256字，GB 13000.1规范）
 ├── scripts/
-│   └── convert-stroke-data.js # 笔顺数据生成脚本（从 hanzi-writer-data 转换）
+│   ├── convert-stroke-data.js     # 笔顺数据生成（hanzi-writer-data → stroke-data.js + cnchar校准）
+│   ├── verify-regenerated.js      # 笔顺验证（检查生成后2256字笔顺正确性）
+│   └── audit-stroke-order.js      # 源数据审计（检查hanzi-writer-data原始笔顺问题）
 ├── cloudfunctions/
 │   ├── login/              # 微信登录（获取 openid）
 │   ├── main/               # 主业务逻辑
@@ -51,8 +53,12 @@
 1. 微信开发者工具导入项目，选择此目录
 2. AppID：`wxa2bbfca6b9ef6ebd`
 3. 开通云开发环境（环境 ID：`cloud1-d7geippqn581097e3`）
-4. 上传云函数：右键 `cloudfunctions/main` →「上传并部署：云端安装依赖」
-5. 编译预览
+4. **配置云函数环境变量**（重要！V2.3 起代码会校验，缺则启动失败）：
+   - 微信云开发控制台 → 云函数 → `main` → 配置 → 环境变量
+   - 添加 4 项：`WX_APPID`（公开值）、`WX_APPSECRET`（**新密钥**）、`BAIDU_API_KEY`（**新密钥**）、`BAIDU_SECRET_KEY`（**新密钥**）
+   - **绝对不能用 git 历史里那串老密钥**（已泄露到 origin，视为废）
+5. 上传云函数：右键 `cloudfunctions/main` →「上传并部署：云端安装依赖」
+6. 编译预览
 
 ## 云数据库
 

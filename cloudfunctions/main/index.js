@@ -5,13 +5,34 @@ const https = require('https');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
-// 微信小程序配置
-const WX_APPID = 'wxa2bbfca6b9ef6ebd';
-const WX_APPSECRET = '1107be03905f4721c554bcfc539708d7';
+// ============================================================
+// 密钥配置 ——
+//
+// 历史教训:这些密钥曾硬编码在 git 仓库中,被推到了 origin 公开分支,
+// 视为已泄露,必须重置!
+//
+// 部署步骤:
+// 1. 微信公众平台 → 开发管理 → 重置 AppSecret(老密钥 1107be... 视为废)
+// 2. 百度智能云 → 应用列表 → 重置 API Key/Secret(老密钥 9Cwtp.../yHh8x... 视为废)
+// 3. 微信云开发控制台 → 云函数 → main → 配置 → 添加环境变量:
+//    WX_APPID, WX_APPSECRET, BAIDU_API_KEY, BAIDU_SECRET_KEY
+// 4. 重新部署云函数
+// 5. ⚠️ git filter-repo 清理历史(已泄露密钥从历史 commit 中抹掉)
+// ============================================================
 
-// 百度语音识别配置
-const BAIDU_API_KEY = '9Cwtp66NdN02jE5sALz7Q5rD';
-const BAIDU_SECRET_KEY = 'yHh8xH9BICC0ZH4oOEGAdZEeXemviwN6';
+// 微信小程序配置(从环境变量读取,缺失则启动失败,避免误用硬编码)
+const WX_APPID = process.env.WX_APPID;
+const WX_APPSECRET = process.env.WX_APPSECRET;
+if (!WX_APPID || !WX_APPSECRET) {
+  throw new Error('请在云函数环境变量中配置 WX_APPID 和 WX_APPSECRET');
+}
+
+// 百度语音识别配置(从环境变量读取)
+const BAIDU_API_KEY = process.env.BAIDU_API_KEY;
+const BAIDU_SECRET_KEY = process.env.BAIDU_SECRET_KEY;
+if (!BAIDU_API_KEY || !BAIDU_SECRET_KEY) {
+  throw new Error('请在云函数环境变量中配置 BAIDU_API_KEY 和 BAIDU_SECRET_KEY');
+}
 
 // 百度 Access Token 缓存
 let baiduAccessToken = null;
@@ -101,6 +122,31 @@ function calculatePriority(progress, today) {
 
   var priority = urgency * 0.5 + difficulty * 0.3 + random * 0.2;
   return Math.min(100, Math.max(0, priority));
+}
+
+// R-14: 成长等级计算
+function getGrowthLevel(masteredCount) {
+  var levels = [
+    { level: 1, label: '小种子', icon: '🌱', min: 0, max: 49, next: 50 },
+    { level: 2, label: '小嫩芽', icon: '🌿', min: 50, max: 149, next: 150 },
+    { level: 3, label: '小苗苗', icon: '🪴', min: 150, max: 349, next: 350 },
+    { level: 4, label: '小树', icon: '🌳', min: 350, max: 699, next: 700 },
+    { level: 5, label: '大树', icon: '🏆', min: 700, max: 9999, next: null }
+  ];
+
+  for (var i = 0; i < levels.length; i++) {
+    if (masteredCount >= levels[i].min && masteredCount <= levels[i].max) {
+      var progress = levels[i].next ? Math.round(((masteredCount - levels[i].min) / (levels[i].max - levels[i].min + 1)) * 100) : 100;
+      return {
+        level: levels[i].level,
+        label: levels[i].label,
+        icon: levels[i].icon,
+        next: levels[i].next,
+        progress: Math.min(100, Math.max(0, progress))
+      };
+    }
+  }
+  return { level: 1, label: '小种子', icon: '🌱', next: 50, progress: 0 };
 }
 
 function calculateUrgencyScore(nextReviewDate, maxInterval, today) {
@@ -306,6 +352,37 @@ function getWxAccessToken() {
   });
 }
 
+// R-15: 发送微信服务通知
+function sendSubscribeMessage(accessToken, openid, message) {
+  return new Promise((resolve, reject) => {
+    var postData = JSON.stringify({
+      touser: openid,
+      template_id: message.template_id,
+      page: message.page || '',
+      data: message.data || {},
+      miniprogram_state: 'formal'
+    });
+    var url = 'https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=' + accessToken;
+    var req = https.request(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    }, function(res) {
+      var body = '';
+      res.on('data', function(chunk) { body += chunk; });
+      res.on('end', function() {
+        try { resolve(JSON.parse(body)); }
+        catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
+}
+
 // 获取百度 Access Token
 function getBaiduAccessToken() {
   return new Promise((resolve, reject) => {
@@ -428,6 +505,12 @@ function comparePinyin(target, result) {
 
 // 云函数入口函数
 exports.main = async (event, context) => {
+  // R-15: 定时触发器路由 — triggerName 为 reviewReminder 时自动调用 sendReviewReminder
+  if (event.triggerName === 'reviewReminder') {
+    event.action = 'sendReviewReminder';
+    event.data = event.data || {};
+  }
+
   const { action, data } = event;
 
   try {
@@ -502,26 +585,71 @@ exports.main = async (event, context) => {
           return { success: true, data: { mastered_count: 0, star_count: 0, flower_count: 0, streak_count: 0 } };
         }
         const user = userRes.data[0];
-        const masteredIds = [...new Set((user.mastered_chars || []).map(id => String(id)))];
 
-        let masteredCount = 0;
-        if (masteredIds.length > 0) {
-          // 与 getMasteredChars 保持一致的计数逻辑：交叉比对 characters 表
-          // 避免 mastered_chars 中的悬空 ID 导致首页和列表页数量不一致
-          const charsRes = await db.collection('characters').limit(2256).get();
-          const allChars = charsRes.data;
-          const matched = allChars.filter(function(c) {
-            var idStr = String(c.id || '');
-            var _idStr = String(c._id || '');
-            return masteredIds.some(function(mid) { return mid === idStr || mid === _idStr; });
-          });
-          // 按 id 去重
-          var seen = new Set();
-          for (var i = 0; i < matched.length; i++) {
-            seen.add(matched[i].id || matched[i]._id);
+        // ============================================================
+        // V2.3: 已掌握改用 learning_progress 计算,过滤 V2.1 之前假阳性数据
+        // 之前用 users.mastered_chars 数组,V2.1 假阳性期(56% 不可信)推入的字
+        // 会被全部算成"已掌握",导致首页和列表页计数虚高
+        // 现在以 learning_progress.status in (familiar, mastered, solid) 为准
+        // (mastered_chars 数组保留作冗余备份,不再作计算来源)
+        //
+        // 注:用 .get().length 而不是 .count() —— count() 对 _.in() 等复杂查询支持有限,
+        // 实际会抛异常走降级路径,导致首页数字虚高。limit(1000) 是兜底上限。
+        // ============================================================
+        var masteredCount = 0;
+        try {
+          var masteredProgressRes = await db.collection('learning_progress')
+            .where({
+              openid: openid,
+              status: _.in(['familiar', 'mastered', 'solid'])
+            })
+            .limit(1000)
+            .get();
+          // 去重:同一个字可能在 learning_progress 中有多条记录(迁移期重叠)
+          var uniqueCharIds = new Set();
+          for (var mpi = 0; mpi < (masteredProgressRes.data || []).length; mpi++) {
+            var cid = String(masteredProgressRes.data[mpi].char_id || '');
+            if (cid) uniqueCharIds.add(cid);
           }
-          masteredCount = seen.size;
+          masteredCount = uniqueCharIds.size;
+        } catch (e) {
+          console.error('getStats: learning_progress 查询失败,降级到 mastered_chars:', e.message);
+          // 降级:老逻辑(仅当 learning_progress 表完全不可用时)
+          const masteredIds = [...new Set((user.mastered_chars || []).map(id => String(id)))];
+          masteredCount = masteredIds.length;
         }
+
+        // R-14: 个人最佳记录
+        var maxCombo = user.max_combo || 0;
+        var totalLearnDays = 0;
+        var todayStats = { newLearned: 0, reviewed: 0 };
+
+        // 统计学习总天数（first_learn_date 去重计数）
+        try {
+          var allProgress = await db.collection('learning_progress')
+            .where({ openid: openid })
+            .field({ first_learn_date: true })
+            .get();
+          var dates = {};
+          for (var di = 0; di < (allProgress.data || []).length; di++) {
+            var d = allProgress.data[di].first_learn_date;
+            if (d) dates[d] = true;
+          }
+          totalLearnDays = Object.keys(dates).length;
+
+          // 今日统计
+          var todayObj3 = new Date();
+          var todayStr3 = todayObj3.getFullYear() + '-' + String(todayObj3.getMonth() + 1).padStart(2, '0') + '-' + String(todayObj3.getDate()).padStart(2, '0');
+          var todayNew = await db.collection('learning_progress')
+            .where({ openid: openid, first_learn_date: todayStr3 })
+            .get();
+          todayStats.newLearned = (todayNew.data || []).length;
+        } catch (e) {
+          console.error('R-14 stats query error:', e.message);
+        }
+
+        // R-14: 成长等级
+        var growthLevel = getGrowthLevel(masteredCount);
 
         return {
           success: true,
@@ -529,7 +657,17 @@ exports.main = async (event, context) => {
             mastered_count: masteredCount,
             star_count: user.star_count || 0,
             flower_count: user.flower_count || 0,
-            streak_count: user.streak_count || 0
+            streak_count: user.streak_count || 0,
+            // R-14 新增
+            growth_level: growthLevel.level,
+            growth_label: growthLevel.label,
+            growth_icon: growthLevel.icon,
+            growth_next: growthLevel.next,
+            growth_progress: growthLevel.progress,
+            max_combo: maxCombo,
+            total_learn_days: totalLearnDays,
+            today_new_learned: todayStats.newLearned,
+            daily_new_limit: 5
           }
         };
       }
@@ -644,10 +782,143 @@ exports.main = async (event, context) => {
           await checkAndUnlockAchievements(db, _, openid, masteredChars.length);
         }
 
+        // ============================================================
+        // 同步创建/更新 learning_progress(V2.2 间隔重复依赖此表)
+        // 之前漏了,导致新字永远进不了 getPendingReview 的复习队列
+        // ============================================================
+        try {
+          // 字符串化 charId(learning_progress.char_id 是 string)
+          const charIdForProgress = charIdStr;
+          const todayObj3 = new Date();
+          const todayStr3 = todayObj3.getFullYear() + '-' +
+            String(todayObj3.getMonth() + 1).padStart(2, '0') + '-' +
+            String(todayObj3.getDate()).padStart(2, '0');
+
+          // 查询是否已有 progress 记录
+          const existProgressRes = await db.collection('learning_progress')
+            .where({ openid: openid, char_id: charIdForProgress })
+            .get();
+
+          if (existProgressRes.data && existProgressRes.data.length > 0) {
+            // 已存在 → 更新 first_learn_date(如果未设) + 最近正确日期
+            const existing = existProgressRes.data[0];
+            const updateFields = {
+              last_review_date: todayStr3,
+              last_correct_date: todayStr3,
+              first_learn_date: existing.first_learn_date || todayStr3,
+              updated_at: new Date()
+            };
+
+            // 如果是首次正式学习(从 mastered 复习),提升 box_level 和状态
+            // 之前是 mastered 状态时不再降,保持原 box
+            if (existing.status === 'new') {
+              const next = calculateNextReview(existing.box_level || 1, true);
+              updateFields.box_level = next.boxLevel;
+              updateFields.next_review_date = next.nextReviewDate;
+              updateFields.review_interval = next.reviewInterval;
+              updateFields.status = 'seeing';
+              updateFields.recognition_correct = (existing.recognition_correct || 0) + 1;
+              updateFields.correct_count = (existing.correct_count || 0) + 1;
+              updateFields.consecutive_correct = (existing.consecutive_correct || 0) + 1;
+              updateFields.consecutive_wrong = 0;
+            }
+
+            await db.collection('learning_progress')
+              .doc(existing._id)
+              .update({ data: updateFields });
+          } else {
+            // 不存在 → 创建默认 progress,并算下次复习日期
+            const defaultProgress = createDefaultProgress(openid, charIdForProgress);
+            const next = calculateNextReview(1, true);
+            defaultProgress.first_learn_date = todayStr3;
+            defaultProgress.last_review_date = todayStr3;
+            defaultProgress.last_correct_date = todayStr3;
+            defaultProgress.status = 'seeing';
+            defaultProgress.box_level = next.boxLevel;
+            defaultProgress.next_review_date = next.nextReviewDate;
+            defaultProgress.review_interval = next.reviewInterval;
+            defaultProgress.recognition_correct = 1;
+            defaultProgress.correct_count = 1;
+            defaultProgress.consecutive_correct = 1;
+
+            await db.collection('learning_progress').add({ data: defaultProgress });
+          }
+        } catch (progressErr) {
+          console.error('recordLearn: learning_progress 同步失败:', progressErr.message);
+          // 不阻塞主流程
+        }
+
         return { success: true, rewards, mastered: true };
       }
 
       // ============================================================
+      // ============================================================
+      // R-13: getDailyStats - 获取今日学习统计（新字数 + 待复习数）
+      // ============================================================
+      case 'getDailyStats': {
+        const { openid } = data;
+
+        var todayObj2 = new Date();
+        var todayYYYY2 = todayObj2.getFullYear();
+        var todayMM2 = String(todayObj2.getMonth() + 1).padStart(2, '0');
+        var todayDD2 = String(todayObj2.getDate()).padStart(2, '0');
+        var todayStr2 = todayYYYY2 + '-' + todayMM2 + '-' + todayDD2;
+
+        var result2 = {
+          dailyNewLearned: 0,
+          pendingReview: 0,
+          dailyNewLimit: 5,
+          canLearnNew: true,
+          reason: ''
+        };
+
+        try {
+          // 统计今日已学新字（first_learn_date = today）
+          var newLearnedRes = await db.collection('learning_progress')
+            .where({
+              openid: openid,
+              first_learn_date: todayStr2
+            })
+            .get();
+          result2.dailyNewLearned = (newLearnedRes.data || []).length;
+
+          // 统计待复习数（next_review_date <= today）
+          var pendingRes = await db.collection('learning_progress')
+            .where({
+              openid: openid,
+              next_review_date: _.lte(todayStr2)
+            })
+            .get();
+          result2.pendingReview = (pendingRes.data || []).length;
+
+          // 根据待复习数动态调整新字上限
+          if (result2.pendingReview > 20) {
+            result2.dailyNewLimit = 0;
+            result2.canLearnNew = false;
+            result2.reason = '待复习内容较多，建议先完成复习再学新字';
+          } else if (result2.pendingReview > 10) {
+            result2.dailyNewLimit = 3;
+            result2.canLearnNew = result2.dailyNewLearned < 3;
+            if (!result2.canLearnNew) {
+              result2.reason = '今日新字已达上限，先复习巩固一下吧';
+            }
+          } else {
+            result2.dailyNewLimit = 5;
+            result2.canLearnNew = result2.dailyNewLearned < 5;
+            if (!result2.canLearnNew) {
+              result2.reason = '今天的新字已经学完啦，明天再来学新字吧';
+            }
+          }
+        } catch (e) {
+          console.error('getDailyStats error:', e.message);
+          // 查询失败时不阻塞学习流程
+          result2.canLearnNew = true;
+          result2.reason = '';
+        }
+
+        return { success: true, data: result2 };
+      }
+
       // V2.2: getPendingReview - 使用间隔重复优先级算法
       // ============================================================
       case 'getPendingReview': {
@@ -788,7 +1059,8 @@ exports.main = async (event, context) => {
       case 'getAchievements': {
         const { openid } = data;
         const userRes = await db.collection('users').where({ openid }).get();
-        const masteredCount = userRes.data[0]?.mastered_chars?.length || 0;
+        // Node 12 不支持可选链 ?. —— 用传统 && 写法(node 14+ 可改回 ?.)
+        const masteredCount = (userRes.data[0] && userRes.data[0].mastered_chars && userRes.data[0].mastered_chars.length) || 0;
 
         const unlockedRes = await db.collection('achievement_log')
           .where({ openid })
@@ -813,8 +1085,8 @@ exports.main = async (event, context) => {
       }
 
       case 'getOptions': {
-        // 获取听音选字选项（同音字+随机干扰项）
-        const { charId } = data;
+        // 获取再认选项（形近字优先 + 同音字补充 + 随机填充）
+        const { charId, shapeSimilar } = data;
 
         // charId 可能是 _id 或 id，尝试用 _id 查询
         let char;
@@ -845,61 +1117,275 @@ exports.main = async (event, context) => {
           return map[match] || match;
         });
 
-        // 获取所有汉字，在内存中筛选同音字
+        // 获取所有汉字
         const allCharsRes = await db.collection('characters').limit(2256).get();
         const allChars = allCharsRes.data;
 
-        // 筛选同音字（排除当前字）
-        const homophones = allChars.filter(c => {
-          if (c._id === char._id || c.id === targetId) return false;
-          const cPinyinBase = (c.pinyin || '').replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, match => {
-            const map = { 'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a', 'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e',
-                          'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i', 'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o',
-                          'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u', 'ǖ': 'v', 'ǘ': 'v', 'ǚ': 'v', 'ǜ': 'v' };
-            return map[match] || match;
-          });
-          return cPinyinBase === pinyinBase;
-        });
+        // 构建 char → doc 快速查找表
+        const charToDoc = {};
+        for (let ai = 0; ai < allChars.length; ai++) {
+          charToDoc[allChars[ai].char] = allChars[ai];
+        }
 
-        // 随机获取干扰项
-        const otherChars = allChars.filter(c => {
-          if (c._id === char._id || c.id === targetId) return false;
-          const cPinyinBase = (c.pinyin || '').replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, match => {
-            const map = { 'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a', 'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e',
-                          'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i', 'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o',
-                          'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u', 'ǖ': 'v', 'ǘ': 'v', 'ǚ': 'v', 'ǜ': 'v' };
-            return map[match] || match;
-          });
-          return cPinyinBase !== pinyinBase;
-        });
-
-        // 打乱顺序
-        homophones.sort(() => Math.random() - 0.5);
-        otherChars.sort(() => Math.random() - 0.5);
-
-        // 组合选项：先放错误选项（最多3个），再放正确答案
         const options = [];
-        for (const h of homophones) {
-          if (options.length < 2) {
-            options.push({ id: h._id, char: h.char, isCorrect: false });
-          }
-        }
-        for (const c of otherChars) {
-          if (options.length < 3) {
-            options.push({ id: c._id, char: c.char, isCorrect: false });
+        const usedChars = {};
+
+        // === 第1优先级：形近字（客户端传入 SHAPE_SIMILAR_MAP 结果） ===
+        const shapeList = shapeSimilar || [];
+        for (let si = 0; si < shapeList.length && options.length < 3; si++) {
+          var similarChar = shapeList[si];
+          if (similarChar === char.char) continue;
+          var doc = charToDoc[similarChar];
+          if (doc && !usedChars[doc.char]) {
+            options.push({ id: doc._id, char: doc.char, pinyin: doc.pinyin || '', isCorrect: false });
+            usedChars[doc.char] = true;
           }
         }
 
-        // 添加正确答案（确保一定在选项中）
-        options.push({ id: char._id, char: char.char, isCorrect: true });
+        // === 第2优先级：同音字补充 ===
+        if (options.length < 3) {
+          const homophones = allChars.filter(c => {
+            if (c._id === char._id || c.id === targetId) return false;
+            if (usedChars[c.char]) return false;
+            const cPinyinBase = (c.pinyin || '').replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, match => {
+              const map = { 'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a', 'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e',
+                            'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i', 'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o',
+                            'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u', 'ǖ': 'v', 'ǘ': 'v', 'ǚ': 'v', 'ǜ': 'v' };
+              return map[match] || match;
+            });
+            return cPinyinBase === pinyinBase;
+          });
+          homophones.sort(() => Math.random() - 0.5);
+          for (let hi = 0; hi < homophones.length && options.length < 3; hi++) {
+            options.push({ id: homophones[hi]._id, char: homophones[hi].char, pinyin: homophones[hi].pinyin || '', isCorrect: false });
+            usedChars[homophones[hi].char] = true;
+          }
+        }
 
-        // 打乱所有选项
+        // === 第3优先级：随机非同音字填充 ===
+        if (options.length < 3) {
+          const otherChars = allChars.filter(c => {
+            if (c._id === char._id || c.id === targetId) return false;
+            if (usedChars[c.char]) return false;
+            const cPinyinBase = (c.pinyin || '').replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, match => {
+              const map = { 'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a', 'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e',
+                            'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i', 'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o',
+                            'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u', 'ǖ': 'v', 'ǘ': 'v', 'ǚ': 'v', 'ǜ': 'v' };
+              return map[match] || match;
+            });
+            return cPinyinBase !== pinyinBase;
+          });
+          otherChars.sort(() => Math.random() - 0.5);
+          for (let oi = 0; oi < otherChars.length && options.length < 3; oi++) {
+            options.push({ id: otherChars[oi]._id, char: otherChars[oi].char, pinyin: otherChars[oi].pinyin || '', isCorrect: false });
+            usedChars[otherChars[oi].char] = true;
+          }
+        }
+
+        // 添加正确答案
+        options.push({ id: char._id, char: char.char, pinyin: char.pinyin || '', isCorrect: true });
+
+        // 洗牌
         for (let i = options.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [options[i], options[j]] = [options[j], options[i]];
+          const temp = options[i];
+          options[i] = options[j];
+          options[j] = temp;
         }
 
         return { success: true, data: { char: { id: targetId, char: char.char, pinyin: char.pinyin }, options: options.slice(0, 4) } };
+      }
+
+      // ============================================================
+      // R-12: getQuestionOptions - 为不同题型生成选项
+      // ============================================================
+      case 'getQuestionOptions': {
+        const { charId, questionType } = data;
+
+        // 获取当前字
+        let targetChar;
+        try {
+          const charRes = await db.collection('characters').doc(charId).get();
+          if (charRes.data) targetChar = charRes.data;
+        } catch (e) {
+          // 尝试用 id 字段查询
+        }
+        if (!targetChar) {
+          const charsRes = await db.collection('characters').limit(2256).get();
+          targetChar = charsRes.data.find(c => String(c._id) === String(charId) || String(c.id) === String(charId));
+        }
+        if (!targetChar) {
+          return { success: false, error: '汉字不存在' };
+        }
+
+        var targetId = targetChar.id || targetChar._id;
+        var allChars = null;
+
+        // 获取所有字（懒加载）
+        async function ensureAllChars() {
+          if (!allChars) {
+            var res = await db.collection('characters').limit(2256).get();
+            allChars = res.data;
+          }
+          return allChars;
+        }
+
+        if (questionType === 'char_meaning') {
+          // 看字选义：正确释义 + 3个干扰释义
+          var correctMeaning = targetChar.meaning || '';
+          if (!correctMeaning) {
+            return { success: false, error: '该字无释义数据' };
+          }
+
+          var allC1 = await ensureAllChars();
+          var distractors = [];
+          // 随机选3个有释义的不同字
+          var shuffled1 = allC1.filter(function(c) {
+            var cId = String(c.id || c._id || '');
+            return cId !== String(targetId) && (c.meaning && c.meaning.length > 0 && c.meaning !== correctMeaning);
+          });
+          shuffled1.sort(function() { return Math.random() - 0.5; });
+          for (var d1 = 0; d1 < Math.min(3, shuffled1.length); d1++) {
+            distractors.push({ id: shuffled1[d1]._id || shuffled1[d1].id, text: shuffled1[d1].meaning, isCorrect: false });
+          }
+
+          // 如果干扰项不足3个，补通用干扰
+          while (distractors.length < 3) {
+            distractors.push({ id: 'placeholder_' + distractors.length, text: '一种事物的名称', isCorrect: false });
+          }
+
+          var meaningOptions = distractors.slice(0, 3);
+          meaningOptions.push({ id: targetId, text: correctMeaning, isCorrect: true });
+
+          // 打乱选项
+          for (var s1 = meaningOptions.length - 1; s1 > 0; s1--) {
+            var j1 = Math.floor(Math.random() * (s1 + 1));
+            var tmp1 = meaningOptions[s1];
+            meaningOptions[s1] = meaningOptions[j1];
+            meaningOptions[j1] = tmp1;
+          }
+
+          return {
+            success: true,
+            data: {
+              char: { id: targetId, char: targetChar.char, pinyin: targetChar.pinyin },
+              options: meaningOptions.slice(0, 4)
+            }
+          };
+        }
+
+        if (questionType === 'char_word') {
+          // 选词含字：正确词语 + 3个干扰词语
+          var correctWords = targetChar.words || [];
+          if (correctWords.length === 0) {
+            return { success: false, error: '该字无组词数据' };
+          }
+          // 随机选一个正确词语
+          var correctWord = correctWords[Math.floor(Math.random() * correctWords.length)];
+
+          var allC2 = await ensureAllChars();
+          var distractorWords = [];
+          // 从其他字收集不包含当前字的词语
+          var shuffled2 = allC2.filter(function(c) {
+            var cId = String(c.id || c._id || '');
+            return cId !== String(targetId);
+          });
+          shuffled2.sort(function() { return Math.random() - 0.5; });
+
+          for (var d2 = 0; d2 < shuffled2.length && distractorWords.length < 3; d2++) {
+            var words = shuffled2[d2].words || [];
+            for (var w = 0; w < words.length && distractorWords.length < 3; w++) {
+              if (words[w] !== correctWord && words[w].indexOf(targetChar.char) === -1) {
+                // 避免重复
+                var dup = false;
+                for (var dw = 0; dw < distractorWords.length; dw++) {
+                  if (distractorWords[dw].text === words[w]) { dup = true; break; }
+                }
+                if (!dup) {
+                  distractorWords.push({ id: shuffled2[d2]._id || shuffled2[d2].id, text: words[w], isCorrect: false });
+                }
+              }
+            }
+          }
+
+          while (distractorWords.length < 3) {
+            distractorWords.push({ id: 'placeholder_' + distractorWords.length, text: '一个词语', isCorrect: false });
+          }
+
+          var wordOptions = distractorWords.slice(0, 3);
+          wordOptions.push({ id: targetId, text: correctWord, isCorrect: true });
+
+          for (var s2 = wordOptions.length - 1; s2 > 0; s2--) {
+            var j2 = Math.floor(Math.random() * (s2 + 1));
+            var tmp2 = wordOptions[s2];
+            wordOptions[s2] = wordOptions[j2];
+            wordOptions[j2] = tmp2;
+          }
+
+          return {
+            success: true,
+            data: {
+              char: { id: targetId, char: targetChar.char, pinyin: targetChar.pinyin },
+              options: wordOptions.slice(0, 4)
+            }
+          };
+        }
+
+        if (questionType === 'pinyin_char') {
+          // 看拼音选字：复用 getOptions 逻辑（同音字+干扰项）
+          var pinyinBase = targetChar.pinyin.replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, function(match) {
+            var map = { 'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a', 'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e',
+                        'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i', 'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o',
+                        'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u', 'ǖ': 'v', 'ǘ': 'v', 'ǚ': 'v', 'ǜ': 'v' };
+            return map[match] || match;
+          });
+
+          var allC3 = await ensureAllChars();
+          var homophones = allC3.filter(function(c) {
+            if (String(c._id) === String(targetId) || String(c.id) === String(targetId)) return false;
+            var cPinyinBase = (c.pinyin || '').replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, function(match) {
+              var mp = { 'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a', 'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e',
+                         'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i', 'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o',
+                         'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u', 'ǖ': 'v', 'ǘ': 'v', 'ǚ': 'v', 'ǜ': 'v' };
+              return mp[match] || match;
+            });
+            return cPinyinBase === pinyinBase;
+          });
+          var otherChars = allC3.filter(function(c) {
+            if (String(c._id) === String(targetId) || String(c.id) === String(targetId)) return false;
+            return !homophones.some(function(h) { return String(h._id) === String(c._id) || String(h.id) === String(c.id); });
+          });
+
+          homophones.sort(function() { return Math.random() - 0.5; });
+          otherChars.sort(function() { return Math.random() - 0.5; });
+
+          var pinyinOpts = [];
+          for (var ph = 0; ph < homophones.length && pinyinOpts.length < 2; ph++) {
+            pinyinOpts.push({ id: homophones[ph]._id, char: homophones[ph].char, pinyin: homophones[ph].pinyin || '', isCorrect: false });
+          }
+          for (var po = 0; po < otherChars.length && pinyinOpts.length < 3; po++) {
+            pinyinOpts.push({ id: otherChars[po]._id, char: otherChars[po].char, pinyin: otherChars[po].pinyin || '', isCorrect: false });
+          }
+          pinyinOpts.push({ id: targetId, char: targetChar.char, pinyin: targetChar.pinyin || '', isCorrect: true });
+
+          for (var sp = pinyinOpts.length - 1; sp > 0; sp--) {
+            var jp = Math.floor(Math.random() * (sp + 1));
+            var tmp = pinyinOpts[sp];
+            pinyinOpts[sp] = pinyinOpts[jp];
+            pinyinOpts[jp] = tmp;
+          }
+
+          return {
+            success: true,
+            data: {
+              char: { id: targetId, char: targetChar.char, pinyin: targetChar.pinyin },
+              options: pinyinOpts.slice(0, 4)
+            }
+          };
+        }
+
+        // 默认：返回 getOptions 兼容结果
+        return { success: false, error: '未知题型' };
       }
 
       // ============================================================
@@ -1021,8 +1507,11 @@ exports.main = async (event, context) => {
             updateData.consecutive_correct = 0;
             updateData.consecutive_wrong = _.inc(1);
             updateData.wrong_count = _.inc(1);
-            updateData.error_type = 'general';
-            updateData['error_count_by_type.general'] = _.inc(1);
+            var clientErrorType = data.errorType || 'general';
+            var validTypes = ['shape_similar', 'sound_similar', 'stroke', 'general'];
+            if (validTypes.indexOf(clientErrorType) === -1) clientErrorType = 'general';
+            updateData.error_type = clientErrorType;
+            updateData['error_count_by_type.' + clientErrorType] = _.inc(1);
             // last_correct_date 保持不变，不设置
           }
 
@@ -1203,8 +1692,9 @@ exports.main = async (event, context) => {
       }
 
       case 'getMasteredChars': {
-        // 获取已掌握汉字列表
-        console.log('=== getMasteredChars START ===');
+        // V2.3: 改用 learning_progress 查"已掌握",过滤 V2.1 假阳性
+        // 之前用 users.mastered_chars,包含 56% 假阳性字(由 Math.random() 假判定产生)
+        console.log('=== getMasteredChars START (V2.3: learning_progress) ===');
         const { openid } = data;
         const userRes = await db.collection('users').where({ openid }).get();
         if (!userRes.data || userRes.data.length === 0) {
@@ -1212,47 +1702,44 @@ exports.main = async (event, context) => {
           return { success: true, data: { chars: [], total: 0 } };
         }
 
-        const user = userRes.data[0];
-        // 去重后获取已掌握ID列表（避免数据库中同一字被重复存储导致数量不一致）
-        const masteredIds = [...new Set((user.mastered_chars || []).map(id => String(id)))];
+        // 1. 从 learning_progress 查所有 status >= familiar 的字
+        var validProgressCharIds = [];
+        try {
+          var validProgressRes = await db.collection('learning_progress')
+            .where({
+              openid: openid,
+              status: _.in(['familiar', 'mastered', 'solid'])
+            })
+            .field({ char_id: true })
+            .get();
+          validProgressCharIds = (validProgressRes.data || []).map(function(p) { return String(p.char_id); });
+        } catch (e) {
+          console.error('=== getMasteredChars: learning_progress 查询失败,降级到 mastered_chars:', e.message);
+        }
 
-        console.log('=== getMasteredChars: masteredIds ===', JSON.stringify(masteredIds));
-        console.log('=== getMasteredChars: user._id ===', user._id);
+        console.log('=== getMasteredChars: validProgressCharIds count ===', validProgressCharIds.length);
 
-        if (masteredIds.length === 0) {
-          console.log('=== getMasteredChars: empty ===');
+        if (validProgressCharIds.length === 0) {
           return { success: true, data: { chars: [], total: 0 } };
         }
 
-        // 获取所有汉字，在内存中过滤
+        // 2. 查 characters 集合的字详情
         const charsRes = await db.collection('characters').limit(2256).get();
         const allChars = charsRes.data;
 
-        console.log('=== getMasteredChars: total chars ===', allChars.length);
-        console.log('=== getMasteredChars: first char sample ===', JSON.stringify(allChars[0]));
-
-        // 过滤出已掌握的汉字（id 和 _id 都要匹配，字符串比较）
-        const masteredChars = allChars.filter(c => {
-          const idStr = String(c.id || '');
-          const _idStr = String(c._id || '');
-          return masteredIds.some(mid => String(mid) === idStr || String(mid) === _idStr);
-        });
-
-        console.log('=== getMasteredChars: matched chars count:', masteredChars.length);
-        console.log('=== matched chars detail:', masteredChars.map(c => ({char: c.char, id: c.id, _id: c._id})));
-
-        // 去重（根据 id 去重，id 优先）
+        // 3. 过滤并去重
         const uniqueChars = [];
         const seenIds = new Set();
-        for (const c of masteredChars) {
-          const id = c.id || c._id;
-          if (!seenIds.has(id)) {
-            seenIds.add(id);
+        for (const c of allChars) {
+          const cId = String(c.id || c._id || '');
+          if (validProgressCharIds.indexOf(cId) !== -1 && !seenIds.has(cId)) {
+            seenIds.add(cId);
             uniqueChars.push(c);
           }
         }
 
-        // 返回格式化数据
+        console.log('=== getMasteredChars: matched chars count:', uniqueChars.length);
+
         return {
           success: true,
           data: {
@@ -1262,11 +1749,6 @@ exports.main = async (event, context) => {
               pinyin: c.pinyin
             })),
             total: uniqueChars.length
-          },
-          debug: {
-            masteredIds: masteredIds,
-            matchedCount: masteredChars.length,
-            uniqueCount: uniqueChars.length
           }
         };
       }
@@ -1463,6 +1945,306 @@ exports.main = async (event, context) => {
           console.error('getLearnChar error:', err.message);
           return { success: false, error: err.message };
         }
+      }
+
+      // ========== R-15: 服务通知 ==========
+
+      // 用户订阅/取消订阅复习提醒
+      case 'subscribeReminder': {
+        var subscribeOpenid = data.openid;
+        var subscribed = data.subscribed !== false;
+        if (!subscribeOpenid) {
+          return { success: false, error: 'openid不能为空' };
+        }
+        try {
+          await db.collection('users').where({ openid: subscribeOpenid }).update({
+            data: {
+              push_subscribed: subscribed,
+              push_updated_at: new Date()
+            }
+          });
+          return { success: true, subscribed: subscribed };
+        } catch (err) {
+          console.error('subscribeReminder error:', err.message);
+          return { success: false, error: err.message };
+        }
+      }
+
+      // 发送复习提醒(由定时触发器或手动调用)
+      // V2.3 P1 改造:分批并行 + 同一天去重(避免定时器反复触发导致重复推送)
+      case 'sendReviewReminder': {
+        try {
+          var todayObj = new Date();
+          // 北京时间
+          var todayStr = todayObj.getFullYear() + '-' +
+            String(todayObj.getMonth() + 1).padStart(2, '0') + '-' +
+            String(todayObj.getDate()).padStart(2, '0');
+
+          // 查询所有订阅了推送的用户
+          var subscribedUsersRes = await db.collection('users')
+            .where({ push_subscribed: true })
+            .limit(100)
+            .get();
+
+          if (!subscribedUsersRes.data || subscribedUsersRes.data.length === 0) {
+            return { success: true, sent: 0, message: '无订阅用户' };
+          }
+
+          // 过滤掉今天已经推过的(用 users.push_last_sent_date 字段做幂等)
+          // 避免定时器重试 / 手动调用 / 多实例并发导致同一天推多次
+          var pendingUsers = subscribedUsersRes.data.filter(function(u) {
+            return u.push_last_sent_date !== todayStr;
+          });
+          var skippedToday = subscribedUsersRes.data.length - pendingUsers.length;
+
+          if (pendingUsers.length === 0) {
+            return {
+              success: true,
+              sent: 0,
+              skipped: skippedToday,
+              message: '今日已全部推送'
+            };
+          }
+
+          var accessToken = await getWxAccessToken();
+
+          // 分批处理(每批 BATCH_SIZE 个用户,Promise.all 并行)
+          // 为什么 10:微信订阅消息 API 限流 50/分钟/小程序,10 个并发单批 ~1-2s,基本不触发
+          var BATCH_SIZE = 10;
+          var sentCount = 0;
+          var failCount = 0;
+
+          for (var bi = 0; bi < pendingUsers.length; bi += BATCH_SIZE) {
+            var batch = pendingUsers.slice(bi, bi + BATCH_SIZE);
+
+            // 包装每个用户的推送逻辑为 Promise
+            var batchPromises = batch.map(function(user) {
+              return (async function() {
+                try {
+                  // 检查是否有待复习的字
+                  var pendingRes = await db.collection('learning_progress')
+                    .where({
+                      openid: user.openid,
+                      next_review_date: _.lte(todayStr),
+                      status: _.in(['seeing', 'familiar', 'mastered'])
+                    })
+                    .limit(1)
+                    .get();
+
+                  var hasPending = pendingRes.data && pendingRes.data.length > 0;
+                  if (!hasPending) {
+                    return { skipped: true, reason: 'no_pending' };
+                  }
+
+                  // 发送服务通知
+                  var pushResult = await sendSubscribeMessage(accessToken, user.openid, {
+                    template_id: 'REVIEW_REMINDER_TEMPLATE_ID',
+                    page: '/pages/review/review',
+                    data: {
+                      thing1: { value: '复习提醒' },
+                      time2: { value: todayStr + ' 18:00' },
+                      thing3: { value: '你有汉字需要复习巩固，点击开始复习吧！' }
+                    }
+                  });
+
+                  if (pushResult.errcode === 0) {
+                    return { sent: true };
+                  } else {
+                    return {
+                      sent: false,
+                      errcode: pushResult.errcode,
+                      errmsg: pushResult.errmsg
+                    };
+                  }
+                } catch (e) {
+                  return { sent: false, error: e.message };
+                }
+              })();
+            });
+
+            // 并行等这一批完成
+            var batchResults = await Promise.all(batchPromises);
+
+            // 处理这一批结果 + 标记已推送的用户
+            for (var bri = 0; bri < batch.length; bri++) {
+              var u = batch[bri];
+              var r = batchResults[bri];
+              if (r.sent) {
+                sentCount++;
+                // 标记今天已推(异步,不阻塞下一批)
+                db.collection('users').where({ openid: u.openid }).update({
+                  data: { push_last_sent_date: todayStr }
+                }).catch(function(markErr) {
+                  console.error('mark push_last_sent_date fail:', u.openid, markErr.message);
+                });
+              } else if (r.skipped) {
+                // 没待复习内容,不算 sent 也不算 fail
+              } else {
+                failCount++;
+                console.error('推送失败 openid=' + u.openid, r);
+              }
+            }
+          }
+
+          return {
+            success: true,
+            sent: sentCount,
+            fail: failCount,
+            skipped: skippedToday,
+            total: subscribedUsersRes.data.length
+          };
+        } catch (err) {
+          console.error('sendReviewReminder error:', err.message);
+          return { success: false, error: err.message };
+        }
+      }
+
+      // ========== R-16: review_logs 数据清洗 ==========
+
+      // 标记 V2.1 之前的假阳性数据（Math.random 判定，非真实 ASR 结果）
+      case 'cleanReviewLogs': {
+        var cutoffDate = data.cutoffDate || '2026-05-30';
+        var dryRun = data.dryRun !== false;
+        var batchSize = data.batchSize || 500;
+
+        try {
+          // 统计符合条件的总数
+          var countRes = await db.collection('review_logs')
+            .where({
+              review_mode: 2,
+              reviewed_at: _.lt(new Date(cutoffDate)),
+              data_quality: _.exists(false)
+            })
+            .count();
+
+          var totalCount = countRes.total || 0;
+          console.log('cleanReviewLogs 待处理总数:', totalCount, 'dryRun:', dryRun);
+
+          if (dryRun) {
+            return {
+              success: true,
+              dryRun: true,
+              totalCount: totalCount,
+              message: '将标记 ' + totalCount + ' 条记录为 data_quality="unreliable_pre_fix"'
+            };
+          }
+
+          if (totalCount === 0) {
+            return { success: true, updated: 0, message: '无待处理记录' };
+          }
+
+          // 分批更新
+          var updated = 0;
+          var batches = Math.ceil(totalCount / batchSize);
+          for (var b = 0; b < batches; b++) {
+            var batchRes = await db.collection('review_logs')
+              .where({
+                review_mode: 2,
+                reviewed_at: _.lt(new Date(cutoffDate)),
+                data_quality: _.exists(false)
+              })
+              .limit(batchSize)
+              .get();
+
+            if (!batchRes.data || batchRes.data.length === 0) {
+              break;
+            }
+
+            for (var i = 0; i < batchRes.data.length; i++) {
+              var doc = batchRes.data[i];
+              try {
+                await db.collection('review_logs').doc(doc._id).update({
+                  data: {
+                    data_quality: 'unreliable_pre_fix',
+                    cleaned_at: new Date()
+                  }
+                });
+                updated++;
+              } catch (updateErr) {
+                console.error('更新 review_logs 失败 id=' + doc._id + ':', updateErr.message);
+              }
+            }
+            console.log('cleanReviewLogs 批次 ' + (b + 1) + '/' + batches + ' 完成，已更新:', updated);
+          }
+
+          return {
+            success: true,
+            dryRun: false,
+            totalCount: totalCount,
+            updated: updated,
+            message: '已标记 ' + updated + ' 条记录'
+          };
+        } catch (err) {
+          console.error('cleanReviewLogs error:', err.message);
+          return { success: false, error: err.message };
+        }
+      }
+
+      // ============================================================
+      // V2.3: resetUserData - 清空当前用户所有学习数据(重置为新用户)
+      // 危险操作,需要显式传 confirm=true,只清自己(用 wxContext.OPENID 锁定)
+      // 用法:
+      //   客户端调用:{ action: 'resetUserData', data: { confirm: true } }
+      //   云端调试:{ action: 'resetUserData', data: { devMode: true, openid: 'xxx', confirm: true } }
+      // ============================================================
+      case 'resetUserData': {
+        // 1. 安全检查:必须显式确认
+        if (!data.confirm) {
+          return { success: false, error: '需要传 confirm: true 才执行重置' };
+        }
+
+        // 2. 优先用 wxContext.OPENID(客户端无法伪造),无登陆态时(云端调试)才用 data.openid
+        const wxContext = cloud.getWXContext();
+        let targetOpenid = wxContext.OPENID;
+        let isDevMode = false;
+        if (!targetOpenid) {
+          if (data.devMode && data.openid) {
+            // ⚠️ 调试模式:云端调试无登陆态,允许 data.openid,但必须 devMode=true
+            targetOpenid = String(data.openid);
+            isDevMode = true;
+            console.warn('resetUserData: 调试模式 devMode=true,使用 data.openid:', targetOpenid);
+          } else {
+            return { success: false, error: '无法识别当前用户(云端调试需传 devMode: true + openid)' };
+          }
+        }
+
+        // 3. 5 个集合逐一清空(分批,云数据库单次最多删 1000 条)
+        const collections = ['users', 'learning_progress', 'review_logs', 'achievement_log', 'reward_logs'];
+        const result = { deleted: {} };
+
+        for (const collName of collections) {
+          try {
+            var deletedCount = 0;
+            // 循环删,直到没有匹配的记录
+            while (true) {
+              const batchRes = await db.collection(collName)
+                .where({ openid: targetOpenid })
+                .limit(100)
+                .get();
+
+              if (!batchRes.data || batchRes.data.length === 0) {
+                break;
+              }
+
+              // 逐条删(remove 不支持批量,且需要 _id)
+              for (const doc of batchRes.data) {
+                try {
+                  await db.collection(collName).doc(doc._id).remove();
+                  deletedCount++;
+                } catch (e) {
+                  console.error('resetUserData delete error:', collName, doc._id, e.message);
+                }
+              }
+            }
+            result.deleted[collName] = deletedCount;
+          } catch (e) {
+            console.error('resetUserData collection error:', collName, e.message);
+            result.deleted[collName] = 'error: ' + e.message;
+          }
+        }
+
+        console.log('resetUserData done for', targetOpenid, result);
+        return { success: true, openid: targetOpenid, devMode: isDevMode, ...result };
       }
 
       default:

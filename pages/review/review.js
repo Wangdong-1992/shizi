@@ -1,14 +1,24 @@
 // 复习页面 - V2.2 间隔重复增强版
 var app = getApp();
 var Delight = require('../../utils/delight.js');
+var ProgHint = require('../../utils/progressive-hint.js');
+var ErrClassifier = require('../../utils/error-classifier.js');
+var QTypes = require('../../utils/question-types.js');
+var TTS = require('../../utils/audio.js');
 
 Page({
   data: {
-    mode: 'listen',
+    questionType: '',    // 当前题型: listen_char | speak_char | char_meaning | pinyin_char | char_word
+    questionTypeLabel: '',
+    questionTypeIcon: '',
+    questionTypeHint: '',
     currentChar: null,
     currentCharId: null,
     currentPinyin: '',
     options: [],
+    // R-12: 不同题型的选项数据
+    meaningOptions: [],      // 看字选义的释义选项
+    wordOptions: [],         // 选词含字的词语选项
     currentIndex: 0,
     totalCount: 10,
     progressPercent: 0,
@@ -67,7 +77,13 @@ Page({
     showFallbackChoice: false,
     fallbackOptions: [],
     fallbackReason: '',
-    asrProcessing: false
+    asrProcessing: false,
+
+    // --- V2.3 渐进式错误提示 ---
+    charErrorCount: 0,
+    showProgressiveHint: false,
+    progressiveHintText: '',
+    progressiveHintLevel: 0
   },
 
   onLoad: function() {
@@ -110,7 +126,7 @@ Page({
     });
   },
 
-  // ========== 显示当前题目 ==========
+  // ========== R-12: 显示当前题目（随机选题型） ==========
   showCurrentQuestion: function() {
     var self = this;
     var reviewQueue = self.data.reviewQueue;
@@ -123,34 +139,82 @@ Page({
     }
 
     var currentChar = reviewQueue[currentIndex];
-    self.setData({
+    var charId = currentChar._id || currentChar.id;
+
+    // 随机选择题型
+    var qType = QTypes.selectType({
+      meaning: currentChar.meaning || '',
+      words: currentChar.words || [],
+      pinyin: currentChar.pinyin || ''
+    });
+    var typeConfig = QTypes.getTypeConfig(qType);
+
+    // 切题:走公共 reset + 自身特有的字/题型字段
+    self.setData(Object.assign({
+      // 自身特有
+      questionType: qType,
+      questionTypeLabel: typeConfig.label,
+      questionTypeIcon: typeConfig.icon,
+      questionTypeHint: typeConfig.hint,
       currentChar: currentChar.char,
-      currentCharId: currentChar._id || currentChar.id,
+      currentCharId: charId,
       currentPinyin: currentChar.pinyin || '',
       currentProgress: currentChar.progress || null,
-      progressPercent: ((currentIndex) / totalCount) * 100,
+      progressPercent: ((currentIndex) / totalCount) * 100
+    }, self.resetReviewState()));
+
+    // 根据题型加载选项数据
+    if (qType === 'listen_char') {
+      self.loadOptions(charId);
+    } else if (qType === 'pinyin_char') {
+      self.loadPinyinOptions(charId);
+    } else if (qType === 'char_meaning') {
+      self.loadMeaningOptions(charId);
+    } else if (qType === 'char_word') {
+      self.loadWordOptions(charId);
+    }
+    // speak_char 无需加载选项
+  },
+
+  /**
+   * 重置复习页状态机(切题前调用)
+   * 对齐 pages/learn/learn.js 的 resetLearnStateMachine() 风格
+   * 未来新增"切题时需要清零"的字段,只在这里加一次即可
+   */
+  resetReviewState: function() {
+    return {
+      // 当前题作答状态
       selectedId: null,
       answered: false,
       tipMessage: '',
+      // 反馈卡片
       feedbackType: '',
       feedbackIcon: '',
       feedbackMsg: '',
+      // 题型选项
       options: [],
-      // 重置粒子
+      meaningOptions: [],
+      wordOptions: [],
+      // ASR 降级
+      showFallbackChoice: false,
+      fallbackOptions: [],
+      asrProcessing: false,
+      // 粒子动画
       showStars: false,
       stars: [],
       showConfetti: false,
       confetti: [],
-      // 重置Box变化提示
+      // V2.2 Box 变化提示
       showBoxToast: false,
       boxChangeToast: '',
       showStatusToast: false,
-      statusChangeToast: ''
-    });
-
-    if (self.data.mode === 'listen') {
-      self.loadOptions(currentChar._id || currentChar.id);
-    }
+      statusChangeToast: '',
+      // V2.3 渐进式错误提示
+      charErrorCount: 0,
+      showProgressiveHint: false,
+      progressiveHintText: '',
+      progressiveHintLevel: 0
+    };
   },
 
   // ========== 获取选项 ==========
@@ -173,24 +237,68 @@ Page({
     });
   },
 
-  // ========== 切换模式 ==========
-  switchMode: function(e) {
-    var newMode = e.currentTarget.dataset.mode;
-    this.setData({
-      mode: newMode,
-      options: [],
-      answered: false,
-      selectedId: null,
-      feedbackType: '',
-      feedbackIcon: '',
-      feedbackMsg: ''
+  // ========== R-12: 加载看拼音选字选项 ==========
+  loadPinyinOptions: function(charId) {
+    var self = this;
+    wx.cloud.callFunction({
+      name: 'main',
+      data: { action: 'getQuestionOptions', data: { charId: charId, questionType: 'pinyin_char' } },
+      success: function(res) {
+        if (res.result && res.result.success && res.result.data) {
+          self.setData({ options: res.result.data.options || [] });
+        } else {
+          // 降级到听音选字
+          self.loadOptions(charId);
+        }
+      },
+      fail: function() {
+        self.loadOptions(charId);
+      }
     });
+  },
 
-    if (newMode === 'listen' && this.data.currentCharId) {
-      this.loadOptions(this.data.currentCharId);
-    } else if (newMode === 'speak') {
-      this.setData({ answered: false });
-    }
+  // ========== R-12: 加载看字选义选项 ==========
+  loadMeaningOptions: function(charId) {
+    var self = this;
+    wx.cloud.callFunction({
+      name: 'main',
+      data: { action: 'getQuestionOptions', data: { charId: charId, questionType: 'char_meaning' } },
+      success: function(res) {
+        if (res.result && res.result.success && res.result.data) {
+          self.setData({ meaningOptions: res.result.data.options || [] });
+        } else {
+          // 降级到听音选字
+          self.setData({ questionType: 'listen_char', questionTypeLabel: '听音选字', questionTypeIcon: '🔊', questionTypeHint: '点击播放，听发音后选择正确答案' });
+          self.loadOptions(charId);
+        }
+      },
+      fail: function() {
+        self.setData({ questionType: 'listen_char', questionTypeLabel: '听音选字', questionTypeIcon: '🔊', questionTypeHint: '点击播放，听发音后选择正确答案' });
+        self.loadOptions(charId);
+      }
+    });
+  },
+
+  // ========== R-12: 加载选词含字选项 ==========
+  loadWordOptions: function(charId) {
+    var self = this;
+    wx.cloud.callFunction({
+      name: 'main',
+      data: { action: 'getQuestionOptions', data: { charId: charId, questionType: 'char_word' } },
+      success: function(res) {
+        if (res.result && res.result.success && res.result.data) {
+          self.setData({ wordOptions: res.result.data.options || [] });
+        } else {
+          // 降级到听音选字
+          self.setData({ questionType: 'listen_char', questionTypeLabel: '听音选字', questionTypeIcon: '🔊', questionTypeHint: '点击播放，听发音后选择正确答案' });
+          self.loadOptions(charId);
+        }
+      },
+      fail: function() {
+        self.setData({ questionType: 'listen_char', questionTypeLabel: '听音选字', questionTypeIcon: '🔊', questionTypeHint: '点击播放，听发音后选择正确答案' });
+        self.loadOptions(charId);
+      }
+    });
   },
 
   // ========== 播放发音 ==========
@@ -203,26 +311,9 @@ Page({
 
     wx.showToast({ title: '播放中...', icon: 'none', duration: 500 });
 
-    wx.cloud.callFunction({
-      name: 'main',
-      data: { action: 'getAudio', data: { char: char, pinyin: pinyin } },
-      success: function(res) {
-        if (res.result && res.result.success && res.result.audioUrl) {
-          var audio = wx.createInnerAudioContext();
-          audio.src = res.result.audioUrl;
-          audio.play();
-          audio.onError(function(err) {
-            console.error('音频播放错误:', err);
-            wx.showToast({ title: '播放失败', icon: 'none' });
-          });
-        } else {
-          wx.showToast({ title: pinyin || '播放发音', icon: 'none' });
-        }
-      },
-      fail: function(err) {
-        console.error('getAudio fail:', err);
-        wx.showToast({ title: '播放失败', icon: 'none' });
-      }
+    // 走 utils/audio.js 的重试逻辑(getAudio 内部 token 偶尔失效)
+    TTS.playTTS(char, pinyin, function() {
+      wx.showToast({ title: '播放失败', icon: 'none' });
     });
   },
 
@@ -242,40 +333,177 @@ Page({
     }
     var isCorrect = selectedOption ? selectedOption.isCorrect : false;
 
-    self.setData({
-      selectedId: selectedId,
-      answered: true
-    });
-
-    // V2.2: 听音选字 = recognition 类型
-    var exerciseType = 'recognition';
-
-    // 记录复习结果
-    self.recordReviewResult(self.data.currentCharId, isCorrect, false, null, exerciseType);
-
-    // 更新连击
-    self.updateCombo(isCorrect);
-
     if (isCorrect) {
-      // 答对 → 震动 + 星星 + 表扬
+      // 答对 → 正常完成
+      self.setData({
+        selectedId: selectedId,
+        answered: true,
+        charErrorCount: 0,
+        showProgressiveHint: false,
+        progressiveHintText: '',
+        progressiveHintLevel: 0
+      });
+
+      var exerciseType = QTypes.getTypeConfig(self.data.questionType).exerciseType;
+      self.recordReviewResult(self.data.currentCharId, true, false, null, exerciseType);
+      self.updateCombo(true);
+
       self.showFeedback('success', '✅', Delight.getPraise());
       try { Delight.vibrate('medium'); } catch (e) {}
       Delight.burstStars(self, 8);
+
+      setTimeout(function() {
+        self.nextQuestion();
+      }, 2200);
     } else {
-      // 答错 → 重震动 + 显示正确答案
-      var correctOption = null;
-      for (var j = 0; j < options.length; j++) {
-        if (options[j].isCorrect) { correctOption = options[j]; break; }
-      }
-      var correctChar = correctOption ? correctOption.char : self.data.currentChar;
-      self.showFeedback('error', '❌', '正确答案：' + correctChar);
+      // 答错 → 渐进提示 + 重试
+      var errorCount = self.data.charErrorCount + 1;
+      var hintText = ProgHint.getProgressiveHint(
+        self.data.currentChar,
+        self.data.currentPinyin,
+        errorCount
+      );
+
+      self.setData({
+        selectedId: selectedId,
+        charErrorCount: errorCount,
+        showProgressiveHint: true,
+        progressiveHintText: hintText,
+        progressiveHintLevel: Math.min(errorCount, 3)
+      });
+
       try { Delight.vibrate('heavy'); } catch (e) {}
+
+      if (errorCount >= 3) {
+        // 3次全错 → 标记错误，下一题 + 错因分类
+        var selectedOption3 = null;
+        var opts3 = self.data.options;
+        for (var j2 = 0; j2 < opts3.length; j2++) {
+          if (String(opts3[j2].id) === String(selectedId)) {
+            selectedOption3 = opts3[j2];
+            break;
+          }
+        }
+        var classification3 = ErrClassifier.classifyError(
+          self.data.currentChar,
+          self.data.currentPinyin,
+          selectedOption3 ? selectedOption3.char : '',
+          selectedOption3 ? (selectedOption3.pinyin || '') : ''
+        );
+
+        self.setData({ answered: true });
+        self.recordReviewResult(self.data.currentCharId, false, false, null, QTypes.getTypeConfig(self.data.questionType).exerciseType, classification3.errorType);
+        self.updateCombo(false);
+
+        var fbMsg3 = '正确答案：' + self.data.currentChar + '\n' + ErrClassifier.getReinforcementHint(classification3.errorType, classification3.similarChar);
+        self.showFeedback('error', '❌', fbMsg3);
+        setTimeout(function() {
+          self.nextQuestion();
+        }, 2200);
+      } else {
+        // 重试 → 提示 + 清除选中
+        self.showFeedback('info', '💡', hintText);
+        setTimeout(function() {
+          self.setData({
+            selectedId: '',
+            feedbackType: '',
+            feedbackIcon: '',
+            feedbackMsg: ''
+          });
+        }, 2000);
+      }
+    }
+  },
+
+  // ========== R-12: 看字选义 — 选择释义 ==========
+  selectMeaning: function(e) {
+    var self = this;
+    if (self.data.answered) return;
+    var selectedId = e.currentTarget.dataset.id;
+    var options = self.data.meaningOptions;
+    var isCorrect = false;
+
+    for (var i = 0; i < options.length; i++) {
+      if (String(options[i].id) === String(selectedId) && options[i].isCorrect) {
+        isCorrect = true;
+        break;
+      }
     }
 
-    // 延迟进入下一题
-    setTimeout(function() {
-      self.nextQuestion();
-    }, 2200);
+    if (isCorrect) {
+      self.setData({ selectedId: selectedId, answered: true, charErrorCount: 0, showProgressiveHint: false, progressiveHintText: '', progressiveHintLevel: 0 });
+      self.recordReviewResult(self.data.currentCharId, true, false, null, 'meaning');
+      self.updateCombo(true);
+      self.showFeedback('success', '✅', Delight.getPraise());
+      try { Delight.vibrate('medium'); } catch (e) {}
+      Delight.burstStars(self, 8);
+      setTimeout(function() { self.nextQuestion(); }, 2200);
+    } else {
+      var errorCount = self.data.charErrorCount + 1;
+      var hintText = ProgHint.getProgressiveHint(self.data.currentChar, self.data.currentPinyin, errorCount);
+      self.setData({ selectedId: selectedId, charErrorCount: errorCount, showProgressiveHint: true, progressiveHintText: hintText, progressiveHintLevel: Math.min(errorCount, 3) });
+      try { Delight.vibrate('heavy'); } catch (e) {}
+
+      if (errorCount >= 3) {
+        var selOpt = null;
+        for (var j = 0; j < options.length; j++) {
+          if (String(options[j].id) === String(selectedId)) { selOpt = options[j]; break; }
+        }
+        var clM = ErrClassifier.classifyError(self.data.currentChar, self.data.currentPinyin, '', '');
+        self.setData({ answered: true });
+        self.recordReviewResult(self.data.currentCharId, false, false, null, 'meaning', clM.errorType);
+        self.updateCombo(false);
+        var fbM = '正确答案：' + self.data.currentChar + ' — ' + (selOpt ? '' : '');
+        self.showFeedback('error', '❌', fbM + ErrClassifier.getReinforcementHint(clM.errorType, clM.similarChar));
+        setTimeout(function() { self.nextQuestion(); }, 2200);
+      } else {
+        self.showFeedback('info', '💡', hintText);
+        setTimeout(function() { self.setData({ selectedId: '', feedbackType: '', feedbackIcon: '', feedbackMsg: '' }); }, 2000);
+      }
+    }
+  },
+
+  // ========== R-12: 选词含字 — 选择词语 ==========
+  selectWord: function(e) {
+    var self = this;
+    if (self.data.answered) return;
+    var selectedId = e.currentTarget.dataset.id;
+    var options = self.data.wordOptions;
+    var isCorrect = false;
+
+    for (var i = 0; i < options.length; i++) {
+      if (String(options[i].id) === String(selectedId) && options[i].isCorrect) {
+        isCorrect = true;
+        break;
+      }
+    }
+
+    if (isCorrect) {
+      self.setData({ selectedId: selectedId, answered: true, charErrorCount: 0, showProgressiveHint: false, progressiveHintText: '', progressiveHintLevel: 0 });
+      self.recordReviewResult(self.data.currentCharId, true, false, null, 'word');
+      self.updateCombo(true);
+      self.showFeedback('success', '✅', Delight.getPraise());
+      try { Delight.vibrate('medium'); } catch (e) {}
+      Delight.burstStars(self, 8);
+      setTimeout(function() { self.nextQuestion(); }, 2200);
+    } else {
+      var errorCount = self.data.charErrorCount + 1;
+      var hintText = ProgHint.getProgressiveHint(self.data.currentChar, self.data.currentPinyin, errorCount);
+      self.setData({ selectedId: selectedId, charErrorCount: errorCount, showProgressiveHint: true, progressiveHintText: hintText, progressiveHintLevel: Math.min(errorCount, 3) });
+      try { Delight.vibrate('heavy'); } catch (e) {}
+
+      if (errorCount >= 3) {
+        var clW = ErrClassifier.classifyError(self.data.currentChar, self.data.currentPinyin, '', '');
+        self.setData({ answered: true });
+        self.recordReviewResult(self.data.currentCharId, false, false, null, 'word', clW.errorType);
+        self.updateCombo(false);
+        self.showFeedback('error', '❌', '正确答案：' + self.data.currentChar + '\n' + ErrClassifier.getReinforcementHint(clW.errorType, clW.similarChar));
+        setTimeout(function() { self.nextQuestion(); }, 2200);
+      } else {
+        self.showFeedback('info', '💡', hintText);
+        setTimeout(function() { self.setData({ selectedId: '', feedbackType: '', feedbackIcon: '', feedbackMsg: '' }); }, 2000);
+      }
+    }
   },
 
   // ========== 更新连击 ==========
@@ -422,7 +650,7 @@ Page({
   },
 
   // ========== V2.2: 记录复习结果（增强版） ==========
-  recordReviewResult: function(charId, isCorrect, isAssisted, asrScore, exerciseType) {
+  recordReviewResult: function(charId, isCorrect, isAssisted, asrScore, exerciseType, errorType) {
     var self = this;
     var exType = exerciseType || 'recognition';
 
@@ -433,11 +661,12 @@ Page({
         data: {
           openid: self.data.openid,
           charId: charId,
-          reviewMode: self.data.mode,
+          reviewMode: self.data.questionType,
           isCorrect: isCorrect,
           isAssisted: isAssisted || false,
           asrScore: asrScore || null,
-          exerciseType: exType
+          exerciseType: exType,
+          errorType: errorType || null
         }
       }
     }).then(function(res) {
@@ -647,26 +876,84 @@ Page({
       }
     }
 
-    self.setData({
-      answered: true,
-      showFallbackChoice: false,
-      selectedId: selectedId
-    });
-
-    // V2.2: 降级选择 = recognition 类型（辅助完成）
-    var exerciseType = 'recognition';
-    self.recordReviewResult(self.data.currentCharId, isCorrect, true, null, exerciseType);
-    self.updateCombo(isCorrect);
-
     if (isCorrect) {
+      // 答对 → 完成
+      self.setData({
+        answered: true,
+        showFallbackChoice: false,
+        selectedId: selectedId,
+        charErrorCount: 0,
+        showProgressiveHint: false,
+        progressiveHintText: '',
+        progressiveHintLevel: 0
+      });
+
+      self.recordReviewResult(self.data.currentCharId, true, true, null, 'recognition');
+      self.updateCombo(true);
+
       self.showFeedback('success', '✅', Delight.getPraise());
       try { Delight.vibrate('medium'); } catch (e) {}
-    } else {
-      self.showFeedback('error', '❌', '正确答案：' + self.data.currentChar);
-      try { Delight.vibrate('heavy'); } catch (e) {}
-    }
 
-    setTimeout(function() { self.nextQuestion(); }, 2000);
+      setTimeout(function() { self.nextQuestion(); }, 2000);
+    } else {
+      // 答错 → 渐进提示 + 重试
+      var errorCount = self.data.charErrorCount + 1;
+      var hintText = ProgHint.getProgressiveHint(
+        self.data.currentChar,
+        self.data.currentPinyin,
+        errorCount
+      );
+
+      self.setData({
+        selectedId: selectedId,
+        charErrorCount: errorCount,
+        showProgressiveHint: true,
+        progressiveHintText: hintText,
+        progressiveHintLevel: Math.min(errorCount, 3)
+      });
+
+      try { Delight.vibrate('heavy'); } catch (e) {}
+
+      if (errorCount >= 3) {
+        // 3次全错 → 提交 + 错因分类
+        var selectedOptFb = null;
+        var fbOpts = self.data.fallbackOptions;
+        for (var m = 0; m < fbOpts.length; m++) {
+          if (fbOpts[m].id === selectedId) {
+            selectedOptFb = fbOpts[m];
+            break;
+          }
+        }
+        var clFb = ErrClassifier.classifyError(
+          self.data.currentChar,
+          self.data.currentPinyin,
+          selectedOptFb ? selectedOptFb.char : '',
+          selectedOptFb ? (selectedOptFb.pinyin || '') : ''
+        );
+
+        self.setData({
+          answered: true,
+          showFallbackChoice: false
+        });
+        self.recordReviewResult(self.data.currentCharId, false, true, null, 'recognition', clFb.errorType);
+        self.updateCombo(false);
+
+        var fbMsgFb = '正确答案：' + self.data.currentChar + '\n' + ErrClassifier.getReinforcementHint(clFb.errorType, clFb.similarChar);
+        self.showFeedback('error', '❌', fbMsgFb);
+        setTimeout(function() { self.nextQuestion(); }, 2000);
+      } else {
+        // 重试 → 提示 + 清除选中
+        self.showFeedback('info', '💡', hintText);
+        setTimeout(function() {
+          self.setData({
+            selectedId: '',
+            feedbackType: '',
+            feedbackIcon: '',
+            feedbackMsg: ''
+          });
+        }, 2000);
+      }
+    }
   },
 
   // ========== 下一题 ==========
@@ -686,6 +973,8 @@ Page({
       answered: false,
       selectedId: null,
       options: [],
+      meaningOptions: [],
+      wordOptions: [],
       showStars: false,
       stars: [],
       showConfetti: false,
@@ -773,6 +1062,8 @@ Page({
       answered: false,
       selectedId: null,
       options: [],
+      meaningOptions: [],
+      wordOptions: [],
       feedbackType: '',
       feedbackIcon: '',
       feedbackMsg: '',

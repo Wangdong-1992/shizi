@@ -19,6 +19,15 @@
       </view>
     </view>
 
+    <!-- R-15: 复习提醒推送 -->
+    <view class="settings-item">
+      <text class="settings-label">📬 复习提醒</text>
+      <view class="settings-right">
+        <text class="settings-value-small">{{pushSubscribed ? '已开启 (每晚18:00)' : '未开启'}}</text>
+        <switch class="settings-switch" checked="{{pushSubscribed}}" color="#07C160" bindchange="togglePushReminder"/>
+      </view>
+    </view>
+
     <!-- 关于我们 -->
     <view class="settings-item" bindtap="showAbout">
       <text class="settings-label">关于我们</text>
@@ -28,6 +37,11 @@
     <!-- 退出登录 -->
     <view class="settings-item logout" bindtap="logout">
       <text class="logout-text">退出登录</text>
+    </view>
+
+    <!-- V2.3: 清除学习数据(危险操作,带二次确认) -->
+    <view class="settings-item logout danger" bindtap="confirmResetData">
+      <text class="logout-text">清除学习数据</text>
     </view>
   </view>
 

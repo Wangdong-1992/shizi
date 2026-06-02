@@ -68,6 +68,14 @@ page {
   color: #ff4d4f;
 }
 
+/* V2.3: 清除数据 — 比退出登录还要"危险"的操作,用警示色 */
+.settings-item.logout.danger {
+  background: #FFF7E6;
+}
+.settings-item.logout.danger .logout-text {
+  color: #FF9F43;
+}
+
 /* ========= 底部弹出弹窗（头像 / 昵称） ========= */
 
 .popup-mask {
@@ -187,4 +195,15 @@ page {
   width: 100%;
   height: 100%;
   border-radius: 50%;
+}
+
+/* ====== R-15: 推送设置 ====== */
+.settings-value-small {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.settings-switch {
+  transform: scale(0.8);
+  margin-left: -8rpx;
 }
