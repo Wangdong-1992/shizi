@@ -149,7 +149,9 @@ Page({
     });
     var typeConfig = QTypes.getTypeConfig(qType);
 
-    self.setData({
+    // 切题:走公共 reset + 自身特有的字/题型字段
+    self.setData(Object.assign({
+      // 自身特有
       questionType: qType,
       questionTypeLabel: typeConfig.label,
       questionTypeIcon: typeConfig.icon,
@@ -158,35 +160,8 @@ Page({
       currentCharId: charId,
       currentPinyin: currentChar.pinyin || '',
       currentProgress: currentChar.progress || null,
-      progressPercent: ((currentIndex) / totalCount) * 100,
-      selectedId: null,
-      answered: false,
-      tipMessage: '',
-      feedbackType: '',
-      feedbackIcon: '',
-      feedbackMsg: '',
-      options: [],
-      meaningOptions: [],
-      wordOptions: [],
-      showFallbackChoice: false,
-      fallbackOptions: [],
-      asrProcessing: false,
-      // 重置粒子
-      showStars: false,
-      stars: [],
-      showConfetti: false,
-      confetti: [],
-      // 重置Box变化提示
-      showBoxToast: false,
-      boxChangeToast: '',
-      showStatusToast: false,
-      statusChangeToast: '',
-      // 重置渐进提示
-      charErrorCount: 0,
-      showProgressiveHint: false,
-      progressiveHintText: '',
-      progressiveHintLevel: 0
-    });
+      progressPercent: ((currentIndex) / totalCount) * 100
+    }, self.resetReviewState()));
 
     // 根据题型加载选项数据
     if (qType === 'listen_char') {
@@ -199,6 +174,47 @@ Page({
       self.loadWordOptions(charId);
     }
     // speak_char 无需加载选项
+  },
+
+  /**
+   * 重置复习页状态机(切题前调用)
+   * 对齐 pages/learn/learn.js 的 resetLearnStateMachine() 风格
+   * 未来新增"切题时需要清零"的字段,只在这里加一次即可
+   */
+  resetReviewState: function() {
+    return {
+      // 当前题作答状态
+      selectedId: null,
+      answered: false,
+      tipMessage: '',
+      // 反馈卡片
+      feedbackType: '',
+      feedbackIcon: '',
+      feedbackMsg: '',
+      // 题型选项
+      options: [],
+      meaningOptions: [],
+      wordOptions: [],
+      // ASR 降级
+      showFallbackChoice: false,
+      fallbackOptions: [],
+      asrProcessing: false,
+      // 粒子动画
+      showStars: false,
+      stars: [],
+      showConfetti: false,
+      confetti: [],
+      // V2.2 Box 变化提示
+      showBoxToast: false,
+      boxChangeToast: '',
+      showStatusToast: false,
+      statusChangeToast: '',
+      // V2.3 渐进式错误提示
+      charErrorCount: 0,
+      showProgressiveHint: false,
+      progressiveHintText: '',
+      progressiveHintLevel: 0
+    };
   },
 
   // ========== 获取选项 ==========
