@@ -5,8 +5,8 @@ var Delight = require('../../utils/delight.js');
 var ProgHint = require('../../utils/progressive-hint.js');
 var ErrClassifier = require('../../utils/error-classifier.js');
 var TTS = require('../../utils/audio.js');
-// V2.4 阶段 2 修复:不 require utils/stroke-data.js(1.6MB 会进主包,超 2MB 限制)
-// 改用异步 loadStrokeData 从云函数 strokeCache 拉数据
+// V2.4 阶段 2 修复:绝对不引用笔顺数据同步文件(1.5MB 会进主包,超 1.5MB 限制)
+// 改用完全异步 loadStrokeData 从云函数 strokeCache 拉数据
 var StrokeData = null;
 
 // 录音管理器
@@ -739,8 +739,8 @@ Page({
 
   /**
    * 初始化 Step3
-   * V2.4 阶段 2 修复:完全不 require utils/stroke-data.js(1.6MB 进主包,超 2MB 限制)
-   * 改用完全异步 loadStrokeData 从云函数 strokeCache 拉数据
+   * V2.4 阶段 2 修复:完全不 require 笔顺数据同步文件(1.5MB 进主包,超 1.5MB 限制)
+   * 改用完全异步 loadStrokeData 从云函数笔顺缓存目录拉数据
    * 体验: 进 Step3 有 200-500ms 延迟(loading),拉到底字 + 引导线出现
    */
   initStep3: function() {

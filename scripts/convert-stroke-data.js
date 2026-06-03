@@ -2,12 +2,18 @@
  * convert-stroke-data.js
  * 基于 hanzi-writer-data (Make Me a Hanzi) 重新生成 stroke-data.js
  *
- * 用法: node scripts/convert-stroke-data.js
+ * 用法:
+ *   node scripts/convert-stroke-data.js          (默认 JS 模式,输出 utils/stroke-data.js)
+ *   node scripts/convert-stroke-data.js --mode=json   (JSON 模式,输出 2256 个 JSON 到云函数 strokeCache/)
  *
  * 数据源: hanzi-writer-data 是基于 Make Me a Hanzi 开源项目的预加工 JSON 数据
  * 笔顺遵循《现代汉语通用字笔顺规范》(GB 13000.1)
  *
  * 原始坐标系: 1024×1024 → 目标坐标系: 200×200
+ *
+ * V2.4 Day 1:加 JSON 模式,支持 B 方案(异步加载)架构
+ *   - JS 模式:输出不带 svgPath 的 1.6MB 主包数据(降级用)
+ *   - JSON 模式:输出带 svgPath 的 2256 个 JSON,放云函数本地(V2.4 阶段 2 用)
  */
 
 var fs = require('fs');
@@ -19,6 +25,10 @@ cnchar.use(require('cnchar-order'));
 var DATA_DIR = path.join(__dirname, '..', 'node_modules', 'hanzi-writer-data');
 var OUTPUT_FILE = path.join(__dirname, '..', 'utils', 'stroke-data.js');
 var XLSX_FILE = path.join(__dirname, '..', 'docs', '一级字表_拼音.xlsx');
+var CLOUD_STROKE_CACHE_DIR = path.join(__dirname, '..', 'cloudfunctions', 'main', 'strokeCache');
+
+// V2.4 模式:js(主包数据,无 svgPath) | json(云函数缓存,带 svgPath)
+var MODE = (process.argv[2] === '--mode=json') ? 'json' : 'js';
 
 var SCALE = 200 / 1024;
 
@@ -284,6 +294,7 @@ function convertChar(charName) {
   try {
     var raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     var medians = raw.medians;
+    var rawStrokes = raw.strokes;  // V2.4 阶段 2:JSON 模式输出 SVG path 用
     if (!medians || medians.length === 0) {
       console.warn('  [SKIP] ' + charName + ' — 无 median 数据');
       return null;
@@ -295,10 +306,18 @@ function convertChar(charName) {
       // 缩放坐标并简化为关键点
       var points = simplifyPoints(median, SCALE);
       var direction = classifyDirection(median);
-      strokes.push({
+
+      var stroke = {
         points: points,
         direction: direction
-      });
+      };
+
+      // V2.4 阶段 2:JSON 模式输出 svgPath
+      if (MODE === 'json' && rawStrokes && rawStrokes[i]) {
+        stroke.svgPath = scaleSvgPath(rawStrokes[i], SCALE);
+      }
+
+      strokes.push(stroke);
     }
 
     // 笔顺纠正: 检测垂直栈并翻转
@@ -400,11 +419,34 @@ function perpendicularDist(point, lineStart, lineEnd) {
   return Math.sqrt(distX * distX + distY * distY);
 }
 
+/**
+ * V2.4 阶段 2(异步加载架构)启用:scaleSvgPath() 函数
+ *
+ * 函数功能:把 SVG path 从 1024 坐标系缩放到 200 坐标系 + 贝塞尔曲线简化
+ * 让底字层和虚线引导层用同源的 Arphic 楷体字形数据
+ * 解决原版"系统 sans-serif 字体 vs Arphic 楷体"不贴合的视觉割裂问题
+ *
+ * V2.4 JSON 模式输出到云函数 strokeCache,本函数在 convertChar 调用
+ */
+function scaleSvgPath(svgPath, scale) {
+  if (!svgPath) return '';
+  // 缩放所有数字(保留 1 位小数,精度 200×0.1 = 0.2 屏幕像素,儿童描红够用)
+  var scaled = svgPath.replace(/(-?\d+\.?\d*)/g, function(m) {
+    return (parseFloat(m) * scale).toFixed(1);
+  });
+  // 贝塞尔曲线简化(Q→L、C→L、T→L)—— 节省 40-50% 数据
+  scaled = scaled.replace(/Q\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/g, 'L $3 $4');
+  scaled = scaled.replace(/C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/g, 'L $5 $6');
+  scaled = scaled.replace(/T\s+(\S+)\s+(\S+)/g, 'L $1 $2');
+  return scaled;
+}
+
 // ==================== 主程序 ====================
 
 console.log('开始转换笔顺数据...');
 console.log('数据源: hanzi-writer-data (Make Me a Hanzi)');
 console.log('目标字符数: ' + TARGET_CHARS.length);
+console.log('输出模式: ' + MODE + (MODE === 'json' ? ' (云函数 strokeCache/)' : ' (主包 utils/stroke-data.js)'));
 console.log('');
 
 var converted = {};
@@ -435,61 +477,86 @@ if (fixLog.length > 0) {
 }
 console.log('');
 
-// 生成输出文件
-var lines = [];
-lines.push('/**');
-lines.push(' * 笔顺路径数据模块 — StrokeData');
-lines.push(' * ');
-lines.push(' * 数据源: Make Me a Hanzi (hanzi-writer-data)');
-lines.push(' * 笔顺遵循《现代汉语通用字笔顺规范》(GB 13000.1)');
-lines.push(' * 坐标系: 200×200 基准画布');
-lines.push(' * 自动生成脚本: scripts/convert-stroke-data.js');
-lines.push(' * 生成时间: ' + new Date().toISOString());
-lines.push(' * ');
-lines.push(' * 格式:');
-lines.push(' *   { char: \'大\', strokes: [{ points: [{x,y},...], direction: \'h\' }] }');
-lines.push(' *   direction: \'h\'=横, \'v\'=竖, \'d\'=撇, \'u\'=捺, \'t\'=折');
-lines.push(' * ');
-lines.push(' * 使用方式:');
-lines.push(' *   var StrokeData = require(\'../../utils/stroke-data.js\');');
-lines.push(' *   var data = StrokeData.getStrokeData(charId);');
-lines.push(' */');
-lines.push('');
-lines.push('var STROKE_MAP = {');
+// ==================== 输出(按模式) ====================
 
-var charKeys = Object.keys(converted).sort();
-for (var k = 0; k < charKeys.length; k++) {
-  var charName = charKeys[k];
-  var data = converted[charName];
-  lines.push('  \'' + charName + '\': { char: \'' + charName + '\', strokes: ' + JSON.stringify(data.strokes) + ' },');
-}
+if (MODE === 'json') {
+  // JSON 模式:输出 2256 个独立 JSON 到 cloudfunctions/main/strokeCache/
+  if (!fs.existsSync(CLOUD_STROKE_CACHE_DIR)) {
+    fs.mkdirSync(CLOUD_STROKE_CACHE_DIR, { recursive: true });
+  }
 
-lines.push('};');
-lines.push('');
-lines.push('/**');
-lines.push(' * 根据汉字查询笔顺数据');
-lines.push(' * @param {string} charId - 汉字字符（如 \'大\'）或包含汉字的数据库 ID');
-lines.push(' * @returns {Object|null} 返回笔画数据 { char, strokes } 或 null');
-lines.push(' */');
-lines.push('function getStrokeData(charId) {');
-lines.push('  if (!charId) return null;');
-lines.push('  // 直接查找');
-lines.push('  if (STROKE_MAP[charId]) return STROKE_MAP[charId];');
-lines.push('  // 遍历查找包含关系');
-lines.push('  for (var key in STROKE_MAP) {');
-lines.push('    if (STROKE_MAP.hasOwnProperty(key)) {');
-lines.push('      if (String(charId).indexOf(key) >= 0) {');
-lines.push('        return STROKE_MAP[key];');
-lines.push('      }');
+  var charKeys = Object.keys(converted).sort();
+  for (var k = 0; k < charKeys.length; k++) {
+    var charName = charKeys[k];
+    var data = converted[charName];
+    var filePath = path.join(CLOUD_STROKE_CACHE_DIR, charName + '.json');
+    var jsonContent = { char: charName, strokes: data.strokes };
+    fs.writeFileSync(filePath, JSON.stringify(jsonContent), 'utf8');
+  }
+
+  console.log('输出目录: ' + CLOUD_STROKE_CACHE_DIR);
+  console.log('输出文件数: ' + charKeys.length);
+  console.log('完成!');
+} else {
+  // JS 模式:输出 utils/stroke-data.js(主包用,不带 svgPath,保持 1.6MB)
+  var lines = [];
+  lines.push('/**');
+  lines.push(' * 笔顺路径数据模块 — StrokeData');
+  lines.push(' * ');
+  lines.push(' * 数据源: Make Me a Hanzi (hanzi-writer-data)');
+  lines.push(' * 笔顺遵循《现代汉语通用字笔顺规范》(GB 13000.1)');
+  lines.push(' * 坐标系: 200×200 基准画布');
+  lines.push(' * 自动生成脚本: scripts/convert-stroke-data.js');
+  lines.push(' * 生成时间: ' + new Date().toISOString());
+  lines.push(' * ');
+  lines.push(' * V2.4 阶段 1:不带 svgPath(主包限制 2MB,1.6MB 装得下)');
+  lines.push(' * V2.4 阶段 2:云函数 strokeCache/ 里有带 svgPath 的版本,异步加载');
+  lines.push(' * ');
+  lines.push(' * 格式:');
+  lines.push(' *   { char: \'大\', strokes: [{ points: [{x,y},...], direction: \'h\' }] }');
+  lines.push(' *   direction: \'h\'=横, \'v\'=竖, \'d\'=撇, \'u\'=捺, \'t\'=折');
+  lines.push(' * ');
+  lines.push(' * 使用方式:');
+  lines.push(' *   var StrokeData = require(\'../../utils/stroke-data.js\');');
+  lines.push(' *   var data = StrokeData.getStrokeData(charId);');
+  lines.push(' */');
+  lines.push('');
+  lines.push('var STROKE_MAP = {');
+
+  var charKeysJs = Object.keys(converted).sort();
+  for (var k = 0; k < charKeysJs.length; k++) {
+    var charName = charKeysJs[k];
+    var data = converted[charName];
+    lines.push('  \'' + charName + '\': { char: \'' + charName + '\', strokes: ' + JSON.stringify(data.strokes) + ' },');
+  }
+
+  lines.push('};');
+  lines.push('');
+  lines.push('/**');
+  lines.push(' * 根据汉字查询笔顺数据');
+  lines.push(' * @param {string} charId - 汉字字符（如 \'大\'）或包含汉字的数据库 ID');
+  lines.push(' * @returns {Object|null} 返回笔画数据 { char, strokes } 或 null');
+  lines.push(' */');
+  lines.push('function getStrokeData(charId) {');
+  lines.push('  if (!charId) return null;');
+  lines.push('  // 直接查找');
+  lines.push('  if (STROKE_MAP[charId]) return STROKE_MAP[charId];');
+  lines.push('  // 遍历查找包含关系');
+  lines.push('  for (var key in STROKE_MAP) {');
+  lines.push('    if (STROKE_MAP.hasOwnProperty(key)) {');
+  lines.push('      if (String(charId).indexOf(key) >= 0) {');
+  lines.push('        return STROKE_MAP[key];');
+  lines.push('      }');
 lines.push('    }');
 lines.push('  }');
 lines.push('  return null;');
 lines.push('}');
 lines.push('');
-lines.push('module.exports = {');
-lines.push('  getStrokeData: getStrokeData');
-lines.push('};');
+  lines.push('module.exports = {');
+  lines.push('  getStrokeData: getStrokeData');
+  lines.push('};');
 
-fs.writeFileSync(OUTPUT_FILE, lines.join('\n'), 'utf8');
-console.log('输出文件: ' + OUTPUT_FILE);
-console.log('完成!');
+  fs.writeFileSync(OUTPUT_FILE, lines.join('\n'), 'utf8');
+  console.log('输出文件: ' + OUTPUT_FILE);
+  console.log('完成!');
+}

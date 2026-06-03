@@ -232,9 +232,13 @@
 
 ## 八、百度语音API配置
 
-- AppID: 123394276
-- API Key: 9Cwtp66NdN02jE5sALz7Q5rD
-- Secret Key: yHh8xH9BICC0ZH4oOEGAdZEeXemviwN6
+> ⚠️ **本节密钥已于 2026-06-01 重置作废**（V2.3 阶段 P0 修复），原因：曾硬编码在 `cloudfunctions/main/index.js` 第 9-14 行并推送到 GitHub 公开分支，视为泄露。
+>
+> 部署时按 README「启动」步骤 4 在云开发控制台 → 云函数 `main` → 配置 → 环境变量 配新值。**绝对不要**按本节填的旧密钥配置。
+
+- AppID: 123394276（公开值，未变更）
+- API Key: `<已重置,2026-06-01,请在云函数环境变量 BAIDU_API_KEY 配新值>`
+- Secret Key: `<已重置,2026-06-01,请在云函数环境变量 BAIDU_SECRET_KEY 配新值>`
 
 ---
 

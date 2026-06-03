@@ -1,19 +1,20 @@
 /**
  * 笔顺路径数据模块 — StrokeData
- * 
+ *
  * 数据源: Make Me a Hanzi (hanzi-writer-data)
  * 笔顺遵循《现代汉语通用字笔顺规范》(GB 13000.1)
  * 坐标系: 200×200 基准画布
  * 自动生成脚本: scripts/convert-stroke-data.js
- * 生成时间: 2026-06-01T07:59:41.550Z
- * 
+ * 生成时间: 2026-06-02T08:59:09.258Z
+ *
  * 格式:
  *   { char: '大', strokes: [{ points: [{x,y},...], direction: 'h' }] }
  *   direction: 'h'=横, 'v'=竖, 'd'=撇, 'u'=捺, 't'=折
- * 
- * 使用方式:
- *   var StrokeData = require('../../utils/stroke-data.js');
- *   var data = StrokeData.getStrokeData(charId);
+ *
+ * 使用方式 (V2.4 阶段 2 改异步):
+ *   旧: 直接 require 此文件 → 1.5MB 进主包,超 1.5MB 限制
+ *   新: 从云函数 strokeCache 拉单字 JSON,主包不再引用此文件
+ *   详情见 docs/system_design_v24.md
  */
 
 var STROKE_MAP = {

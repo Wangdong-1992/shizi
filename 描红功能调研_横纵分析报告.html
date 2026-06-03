@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <style>
+@page {
+    size: A4;
+    margin: 25mm 20mm 20mm 20mm;
+
+    @top-center {
+        content: "shizi 描红功能优化:横纵分析报告  |  横纵分析法深度研究报告";
+        font-family: "Droid Sans Fallback", Helvetica, Arial, sans-serif;
+        font-size: 8pt;
+        color: #95a5a6;
+        border-bottom: 0.5pt solid #ecf0f1;
+        padding-bottom: 3mm;
+    }
+
+    @bottom-center {
+        content: "第 " counter(page) " 页";
+        font-family: "Droid Sans Fallback", Helvetica, Arial, sans-serif;
+        font-size: 8pt;
+        color: #95a5a6;
+        border-top: 0.8pt solid #1a5276;
+        padding-top: 2mm;
+    }
+}
+
+@page :first {
+    @top-center { content: none; }
+    @bottom-center { content: none; }
+}
+
+body {
+    font-family: "Droid Sans Fallback", Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.75;
+    color: #2c3e50;
+    text-align: justify;
+}
+
+/* 封面 */
+.cover {
+    page-break-after: always;
+    text-align: center;
+    padding-top: 45%;
+}
+.cover h1 {
+    font-size: 28pt;
+    color: #1a5276;
+    margin-bottom: 8mm;
+    font-weight: bold;
+    letter-spacing: 2pt;
+}
+.cover .subtitle {
+    font-size: 14pt;
+    color: #95a5a6;
+    margin-bottom: 6mm;
+}
+.cover .meta {
+    font-size: 11pt;
+    color: #95a5a6;
+    margin-bottom: 4mm;
+}
+.cover .divider {
+    width: 60%;
+    margin: 8mm auto;
+    border: none;
+    border-top: 1.5pt solid #1a5276;
+}
+
+/* 一级标题 */
+h1 {
+    font-size: 20pt;
+    color: #1a5276;
+    margin-top: 16mm;
+    margin-bottom: 6mm;
+    padding-bottom: 3mm;
+    border-bottom: 2pt solid #1a5276;
+    page-break-before: always;
+    font-weight: bold;
+}
+
+/* 二级标题 */
+h2 {
+    font-size: 14pt;
+    color: #1e8449;
+    margin-top: 10mm;
+    margin-bottom: 5mm;
+    font-weight: bold;
+}
+
+/* 三级标题 */
+h3 {
+    font-size: 12pt;
+    color: #2e86c1;
+    margin-top: 6mm;
+    margin-bottom: 3mm;
+    font-weight: bold;
+}
+
+h4 {
+    font-size: 11pt;
+    color: #5b2c6f;
+    margin-top: 5mm;
+    margin-bottom: 2mm;
+    font-weight: bold;
+}
+
+/* 段落 */
+p {
+    margin-top: 1.5mm;
+    margin-bottom: 1.5mm;
+    orphans: 3;
+    widows: 3;
+}
+
+/* 引用块 */
+blockquote {
+    margin: 4mm 0;
+    padding: 4mm 4mm 4mm 10mm;
+    background: #f8f9fa;
+    border-left: 3pt solid #1a5276;
+    color: #5d6d7e;
+    font-size: 10pt;
+}
+blockquote p {
+    margin: 1mm 0;
+}
+
+/* 粗体 */
+strong, b {
+    font-weight: bold;
+    color: #1a252f;
+}
+
+/* 行内代码 */
+code {
+    font-family: "Courier New", Courier, monospace;
+    background: #fdf2e9;
+    color: #c0392b;
+    padding: 0.5mm 1.5mm;
+    border-radius: 2pt;
+    font-size: 9.5pt;
+}
+
+/* 表格 */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4mm 0;
+    font-size: 9.5pt;
+}
+thead th {
+    background: #1a5276;
+    color: white;
+    padding: 3mm;
+    text-align: left;
+    font-weight: bold;
+}
+tbody td {
+    padding: 2.5mm 3mm;
+    border-bottom: 0.5pt solid #bdc3c7;
+}
+tbody tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+/* 分隔线 */
+hr {
+    border: none;
+    border-top: 0.5pt solid #bdc3c7;
+    margin: 4mm 0;
+}
+
+/* 列表 */
+ul, ol {
+    margin: 2mm 0;
+    padding-left: 8mm;
+}
+li {
+    margin-bottom: 1mm;
+}
+
+/* 链接 */
+a {
+    color: #2e86c1;
+    text-decoration: none;
+}
+</style>
+</head>
+<body>
+
+    <div class="cover">
+        <h1 style="page-break-before: avoid; border: none;">shizi 描红功能优化:横纵分析报告</h1>
+        <div class="subtitle">横纵分析法深度研究报告</div>
+        <div class='meta'>研究时间:2026-06-02 | 所属领域:儿童汉字教育 / 描红技术 | 研究对象类型:产品功能 + 技术方案</div>
+        <hr class="divider">
+        <div class="meta">作者: Mavis</div>
+    </div>
+    
+
+<blockquote>
+<p>研究时间:2026-06-02 | 所属领域:儿童汉字教育 / 描红技术 | 研究对象类型:产品功能 + 技术方案<br>
+方法论:横纵分析法(数字生命卡兹克提出) — 纵向追时间深度,横向追同期广度</p>
+</blockquote>
+<hr>
+<h2>目录</h2>
+<ul>
+<li>一、一句话定义</li>
+<li>二、纵向分析:从纸笔到 AI,描红技术的 16 年演进</li>
+<li>三、横向分析:主流产品对比与笔顺贴合度排名</li>
+<li>四、技术深度:笔顺如何更贴合字体</li>
+<li>五、横纵交汇:shizi 的机会窗口</li>
+<li>六、行动计划:V2.4 改造的 3 个具体方案</li>
+<li>七、信息来源</li>
+</ul>
+<hr>
+<h2>一、一句话定义</h2>
+<p><strong>描红的"笔顺贴合字体"问题</strong>,本质是:在数字屏幕上,让"引导虚线(浅色字或虚线 path)"和"字体本身的轮廓"在视觉上完全重合,并且能实时判断用户笔触"是否对得上"这一标准字形 —— 它既是渲染问题,也是数据问题,更是算法问题。</p>
+<hr>
+<h2>二、纵向分析:从纸笔到 AI,描红技术的 16 年演进</h2>
+<h3>2.1 纸笔时代(2000-2010):千年传统的最后阵地</h3>
+<p>描红(古人称"描朱"或"顺朱")的历史远比我们想象的久远。明清时期已经规模化,学童最常用的描朱教材是《上大人》,这一形态在中国延续了上千年。</p>
+<p>这一时期儿童练字产品的核心设计原则,被后来所有数字化产品继承:</p>
+<ol>
+<li><strong>田字格 / 米字格的格子定位系统</strong>:把一个字的几何中心、笔画起止点固定在方格内。至今,洪恩、宝宝巴士、有道的写字笔产品里,都能看到田字格的身影。</li>
+<li><strong>红色楷书范字 + 黑色书写区域</strong>的对照关系:这条从《上大人》传承下来的视觉范式,被 2024 年腾讯云发布的《WPS 做描红:数字化练字的新纪元》原样搬到了 WPS 文档模板。</li>
+<li><strong>笔画顺序的展示与重复</strong>:"8 句口诀"式的笔画口诀,无论在田字格贴纸还是 2010 年代的 Flash 课件里,都是核心教学载体。</li>
+</ol>
+<p><strong>这一时代的局限</strong>:纸笔无法自动判断孩子写得好不好,反馈完全依赖家长和老师;笔画数据不标准,不同字帖对"毕"字的第一笔是"横"还是"竖勾"有分歧。</p>
+<h3>2.2 电子化起步(2010-2015):iPad 浪潮与第一批儿童练字 app</h3>
+<p>2010 年,iPad 横空出世。这一年的儿童教育 app 市场有几个关键事件:</p>
+<p><strong>1. 洪恩的早期布局</strong><br>
+洪恩(北京洪恩教育科技股份有限公司)成立于 2003 年,创始人池宇峰。2010 年时,洪恩已经覆盖 1.5 万所幼儿园、300 多家培训学校,产品出口至 10 多个国家 —— 这是行业内最早完成"线下 → 数字化"基础设施的玩家。但 2010 年的洪恩主要还是<strong>光盘 + 点读笔</strong>的形态,真正发力"识字"是 2016-2018 年的事。</p>
+<p><strong>2. 悟空识字:西游 IP + Flash 动画的初代范本</strong><br>
+悟空识字 2010 年上线,最早是基于 Cocos2d-x 框架、用 Flash 动画承载的桌面端产品,后迁移到 iPad。它把 1200 个常用汉字、5000 多个词语套进了《西游记》剧情。从技术角度看,这一代产品的"笔顺"是<strong>预渲染好的 Flash 动画</strong>或 GIF 序列,无法做交互 —— 孩子只能"看动画",不能"自己写"。</p>
+<p><strong>3. 笔顺展示的技术实现(2010-2015)</strong><br>
+这一时期的"笔顺"本质上是两种技术:</p>
+<ul>
+<li><strong>预渲染动画</strong>:Flash / GIF 视频,做不了交互,只能"看"。</li>
+<li><strong>TrueType 字体反推</strong>:CSDN 上 2010 年前后的技术博客展示了用 Windows GDI+ Path 技术从 TrueType 字体数据反推笔顺的方案 —— 这种方案被后来的部分国产 app 沿用,但<strong>精度极差</strong>(因为 TrueType 字体本身不带"先写哪一笔"的语义信息,反推出来的顺序常常和标准笔顺相反)。</li>
+</ul>
+<p><strong>这就是为什么"毕"字会被写错</strong> —— 在没有权威开源笔顺数据的年代,每个 app 各说各话,孩子学到的东西可能本身就是错的。</p>
+<h3>2.3 标准化与开源(2015-2020):Make Me a Hanzi 与 Hanzi Writer 横空出世</h3>
+<p>2015 年前后,儿童练字/描红产品发生了一场静悄悄但影响深远的<strong>基础设施革命</strong> —— 这要从一个叫 skishore 的开发者说起。</p>
+<p><strong>1. Make Me a Hanzi(2014-2015):开源汉字数据的奠基之作</strong></p>
+<p>GitHub 仓库 https://github.com/skishore/makemeahanzi 显示,该项目由 skishore 主导,数据来源于台湾<strong>文鼎科技(Arphic Technology)</strong>于 1999 年以宽松许可协议发布的"Arphic PL KaitiM GB"和"Arphic PL UKai"两款楷书字体。skishore 把这些字体的笔画、字形结构(IDC 描述序列)、拼音、释义、部首等数据手工整理成两个文件:</p>
+<ul>
+<li><code>dictionary.txt</code>:9000+ 汉字的字典数据(释义、拼音、IDS 分解、字源)</li>
+<li><code>graphics.txt</code>:每个汉字的 SVG 路径,按<strong>标准笔顺</strong>排列(1024×1024 坐标系)</li>
+</ul>
+<p><strong>这个项目的革命性在于</strong>:<br>
+- 首次提供了<strong>可机读的、经过验证的 9000+ 汉字标准笔顺 SVG 路径</strong>;<br>
+- 采用 Arphic 的<strong>楷书</strong>(而非宋体),更适合儿童学习;<br>
+- 数据文件是<strong>逐行 JSON</strong>,开发者可以直接解析;<br>
+- 截至 2026 年,该项目已获 <strong>2.5k stars / 590 forks</strong>。</p>
+<p>GitHub 主页明确列出了它的下游用户:<strong>Hanzi Writer JS 库</strong>、<strong>HanDeDict 中德词典</strong>、<strong>Hanping Chinese Dictionary</strong>(iOS / Android)、<strong>繁体字帖</strong>iOS app 等,形成了一个完整的开源汉字数据生态。</p>
+<p><strong>2. Hanzi Writer(2015+):前端笔顺动画的事实标准</strong></p>
+<p>Hanzi Writer 仓库由 chanind 创建,目前已积累 <strong>4.8k stars / 708 forks,258 次 commit,58 个 release</strong>(最新 v3.7.3,2025 年 9 月发布)。它本质上是一个<strong>基于 Make Me a Hanzi 数据的渲染层</strong>:</p>
+<ul>
+<li>用 SVG 渲染汉字</li>
+<li>用 SVG <code>&lt;path&gt;</code> 配合 <code>stroke-dasharray</code> 实现<strong>逐笔动画</strong></li>
+<li>内置<strong>手写测验</strong>功能(quiz mode)—— 可以判断用户的笔画顺序、起止点、覆盖区域是否正确</li>
+<li>库大小仅 <strong>35 KB(min 版 9 KB)</strong>,可嵌入 Web、iOS、Android、小程序</li>
+</ul>
+<p>根据 CSDN 2019 年的介绍和掘金 2024 年的报道,Hanzi Writer 已成为"全球中文学习开发者<strong>人手一份的笔顺库</strong>"。</p>
+<p><strong>3. 微信小程序生态的爆发(2017-2020)</strong></p>
+<p>2017 年微信小程序正式上线后,儿童教育赛道快速迁移:</p>
+<ul>
+<li>2017 年,<strong>北京语言大学</strong>信息科学学院安维华、刘颖滨老师团队发布"汉字笔画、笔顺大测试"小程序,提供<strong>笔划美化、笔顺判别、书写判别</strong>三大功能 —— 这是学术界第一次把"AI 笔顺判别"做成了消费级小程序。</li>
+<li>2019 年,<code>hanzi-writer-miniprogram</code> 微信小程序组件发布,成为小程序描红的事实路径。但 2024 年 2 月 20 日被 archived,反映<strong>微信小程序生态的快速变化</strong>(基础库升级、Canvas API 重构、jsdelivr CDN 备案撤销等多重原因)。</li>
+</ul>
+<p><strong>关键转折点</strong>:开源数据(Make Me a Hanzi / hanzi-writer-data)让<strong>独立开发者和中小团队也能做出"标准笔顺"的描红产品</strong>。在这之前,大厂的笔顺数据是私有资产;之后,它成了<strong>公共基础设施</strong>。这就是为什么 2020 年之后,微信小程序里"练字 / 描红"赛道会出现<strong>指数级增长</strong> —— 技术门槛被 Make Me a Hanzi 打平了。</p>
+<h3>2.4 AI 化与精准描红(2020-2026):从"能写"到"写对"</h3>
+<p>2020 年起,儿童练字产品进入<strong>AI 化阶段</strong>。这一阶段的关键变化,是从"展示正确笔顺"升级到"<strong>判断用户写得对不对</strong>"。</p>
+<p><strong>1. 洪恩写字:从"动画笔顺"到"AI 智能评分 + 智能笔"</strong><br>
+洪恩 2023 年推出的《洪恩写字》app 配套<strong>洪恩智能写字笔</strong>(前端有微观摄像头 + 蓝牙),<strong>实时捕捉笔画轨迹</strong>,误差&lt;0.1mm;<strong>多维度 AI 智能评分</strong>:从结构比例、重心平衡、笔画顺序、力度控制、形态美观等维度生成报告;<strong>圈注纠错</strong>:在屏幕上给写错的字标红、显示问题。</p>
+<p><strong>2. 手写识别 API 的成熟</strong><br>
+百度 AI、好未来 AI、科大讯飞都在 2020 年前后开放了<strong>手写中文识别 API</strong>:<br>
+- 百度手写识别<strong>准确率 &gt;90%</strong><br>
+- 好未来 AI 开放平台"手写识别"产品页,对<strong>试卷、作文、作业图片</strong>做识别,字符准确率 90%+,手写英文 98%+</p>
+<p><strong>3. 微信小程序 Canvas 描红的标准化方案</strong><br>
+根据 CSDN 2024-2025 年间多篇技术博客,小程序内做描红已基本收敛为如下技术栈:</p>
+<pre><code>WXML: &lt;canvas type=&quot;2d&quot; id=&quot;trace-canvas&quot; bindtouchstart/move/end/&gt;
+JS:   const query = wx.createSelectorQuery()
+      query.select('#trace-canvas').fields({node:true,size:true}).exec(res =&gt; {
+        const canvas = res[0].node
+        const dpr = wx.getSystemInfoSync().pixelRatio
+        canvas.width = res[0].width * dpr
+        canvas.height = res[0].height * dpr
+        ctx.scale(dpr, dpr)
+      })
+</code></pre>
+<p><strong>4. 微信小程序 + Hanzi Writer 的工程挑战</strong><br>
+典型坑点:<br>
+- <strong>jsdelivr CDN 备案被撤销</strong>(2021 年 12 月起),小程序不能直接 ajax 加载笔顺数据,需要用 <code>charDataLoader</code> 自定义加载;<br>
+- <strong>wx.createCanvasContext 旧版 API 被废弃</strong>,2.9.0 之后必须用 type="2d" + node 模式;<br>
+- <strong>hanzi-writer-data 数据量太大</strong>(9000+ 汉字),要么打包到本地(小程序包大小限制 20MB),要么用云函数按需加载。</p>
+<h3>2.5 关键里程碑时间线</h3>
+<table>
+<thead>
+<tr>
+<th>年份</th>
+<th>事件</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2003</td>
+<td>洪恩教育成立,推出《开天辟地》等电脑教育软件</td>
+<td>奠定中国儿童教育软件产业基础</td>
+</tr>
+<tr>
+<td>2010</td>
+<td>iPad 上市;悟空识字初代版本发布;洪恩覆盖 1.5 万所幼儿园</td>
+<td>数字化儿童教育的起点</td>
+</tr>
+<tr>
+<td>2014</td>
+<td>Make Me a Hanzi 项目在 GitHub 上线</td>
+<td><strong>首个开源 9000+ 汉字笔顺数据集</strong></td>
+</tr>
+<tr>
+<td>2015</td>
+<td>Hanzi Writer(由 chanind)首个版本发布</td>
+<td><strong>前端汉字笔顺动画的事实标准</strong></td>
+</tr>
+<tr>
+<td>2016</td>
+<td>洪恩识字正式上线,主打 3D 动画 + 游戏化</td>
+<td>大厂进入"识字 app"赛道</td>
+</tr>
+<tr>
+<td>2017</td>
+<td>微信小程序正式上线</td>
+<td>全新分发渠道</td>
+</tr>
+<tr>
+<td>2017</td>
+<td>cnchar(同济大学 theajack)首个版本</td>
+<td><strong>国内本土开源汉字工具库</strong></td>
+</tr>
+<tr>
+<td>2017</td>
+<td>北语安维华团队"汉字笔顺大测试"小程序</td>
+<td><strong>首个 AI 笔顺判别的小程序</strong></td>
+</tr>
+<tr>
+<td>2018</td>
+<td>有道推出首代词典笔;洪恩纽交所上市(IH)</td>
+<td>硬件化、AI 化、资本化</td>
+</tr>
+<tr>
+<td>2019</td>
+<td>hanzi-writer-miniprogram 发布</td>
+<td>小程序笔顺描红的官方桥梁</td>
+</tr>
+<tr>
+<td>2020</td>
+<td>洪恩纽交所上市,月活峰值数千万</td>
+<td>行业资本巅峰</td>
+</tr>
+<tr>
+<td>2021.07</td>
+<td><strong>"双减"政策落地</strong></td>
+<td>K12 学科类培训受重击,<strong>素质类(书法/识字)赛道反获红利</strong></td>
+</tr>
+<tr>
+<td>2021.12</td>
+<td>jsdelivr CDN 在国内备案撤销</td>
+<td>小程序开发者<strong>被迫</strong>自建笔顺数据加载</td>
+</tr>
+<tr>
+<td>2022-2023</td>
+<td>hanzi-writer-miniprogram 2024.2.20 archived</td>
+<td>官方桥梁停维,<strong>社区自行 fork</strong></td>
+</tr>
+<tr>
+<td>2023</td>
+<td>洪恩写字 + 智能笔发布,十大维度 AI 评分</td>
+<td><strong>"AI + 智能硬件"</strong>成为头部产品标配</td>
+</tr>
+<tr>
+<td>2025.09</td>
+<td>Hanzi Writer v3.7.3(2025-09-17)</td>
+<td>仍在活跃维护</td>
+</tr>
+<tr>
+<td>2026</td>
+<td>微信小程序 Canvas 2D + Hanzi Writer + AI 跟读/OCR 成为独立开发者的主流技术栈</td>
+<td>基础设施趋于稳定</td>
+</tr>
+</tbody>
+</table>
+<h3>2.6 纵向启示:对 shizi 项目的关键判断</h3>
+<p><strong>16 年的行业演进已经证明了一件事</strong>:开源数据(Make Me a Hanzi)打平了技术门槛,<strong>决定胜负的是"内容+体验"而非"笔顺精度"</strong>。洪恩、有道能把 1300 字卖 300 元/年会员,靠的是游戏化 + 智能硬件 + 品牌;shizi 的差异化必须是"<strong>更懂 3-6 岁认知节奏</strong>",而非"更准的笔顺"。</p>
+<p>但 —— "笔顺贴合字形"这件事,<strong>没有任何一家做到字形数据与标准楷体字模像素级对齐</strong>。这是行业的真空带,也是 shizi V2.4 改造的核心机会。</p>
+<hr>
+<h2>三、横向分析:主流产品对比与笔顺贴合度排名</h2>
+<h3>3.1 市场格局</h3>
+<p>国内"儿童识字/练字"赛道已经形成清晰的两极分化:</p>
+<p><strong>第一极(偏"识字"的综合产品,描红是子功能)</strong>:洪恩识字(隶属 iHuman)、有道少儿词典(网易有道)、宝宝巴士汉字、叫叫识字、小伴龙、悟空识字。2024 Q3 洪恩系整体 MAU 创新高至 2912 万,同比 +14.8%;2022 Q1 单洪恩识字 1839 万 MAU、161 万付费用户。</p>
+<p><strong>第二极(偏"练字"的硬件/课程产品,描红是核心)</strong>:洪恩写字(2022 年 7 月发布,搭配洪恩 AI 智能写字笔)、河小象写字(2017 年创办,2019 年 B 轮融资 2 亿人民币,1500 万孩子)、麦田写字王(搭配麦田智绘神笔)。这一极走"AI 图像识别 + 笔顺比对"路线,核心壁垒是"识别引擎+纠错模型"而非"笔顺数据"本身。</p>
+<p><strong>真正"笔顺贴合字体"做得好的产品,目前没有任何一家做到字形数据与标准楷体字模像素级对齐</strong> —— 这是行业的真空带,也是 shizi V2.4 改造的核心机会。</p>
+<h3>3.2 各产品详细分析</h3>
+<h4>1. 洪恩识字(洪恩教育 NYSE:IH)</h4>
+<ul>
+<li><strong>定位</strong>:面向 2-8 岁的儿童识字 app(洪恩识字 1300 字);洪恩写字 6-12 岁,以软硬件一体(智能笔 + 定制写字本)主打硬笔书写练习。</li>
+<li><strong>笔顺技术</strong>:<strong>官方原话 ——"我们人工为 1300 个字、近一万个笔画进行编辑,只为让每个孩子写出的字都是不同的"</strong>(云南网对洪恩识字制作人专访)。这意味着洪恩是<strong>逐字人工编辑的路径数据</strong>,而非基于开源库。1300 字 × 平均 8 笔 ≈ 1 万个笔画的编辑工作量,符合"5 年磨一剑"的产品节奏。</li>
+<li><strong>字体匹配度</strong>:洪恩识字的"写"是<strong>手指在屏幕上描</strong>,孩子看到的是洪恩<strong>自己绘制</strong>的楷体范字 + 路径动画,<strong>字形数据是洪恩美术团队原创</strong>,而非调用系统字体。<strong>字模与路径数据是同一组美术资产,贴合度天然就高</strong>。</li>
+<li><strong>亮点 / 槽点</strong>:</li>
+<li>亮点:4K 3D 场景,笔顺粒子特效,游戏化做的最重;"玩 → 认 → 练 → 写 → 测"五步闭环;艾宾浩斯 4 轮复习;护眼、防沉迷、家长端数据报告。</li>
+<li>槽点:游戏占比偏重,孩子容易沉迷;后期 298 元/年起价格不低。</li>
+<li><strong>对我们的启发</strong>:</li>
+<li><strong>洪恩"自研字形 + 自研路径"的一体化方案</strong>是贴合度的天花板 —— 字怎么写和怎么画是同一批美术资产画出来的,不可能"对不上"。这是 V2.4 应该借鉴的核心理念:<strong>字模、笔顺、动画三套数据要么用同一份源,要么用算法严格配准</strong>。</li>
+<li>但 shizi 是小程序,不能像洪恩那样"5 年 1 万笔画人工编辑",需要依赖开源数据 + 后处理校准。</li>
+</ul>
+<h4>2. 有道少儿词典(网易有道)</h4>
+<ul>
+<li><strong>定位</strong>:6-12 岁儿童语言学习工具,<strong>主打"中文查字 + 英文查词"的词典 + 跟读 + 笔顺跟写</strong>,免费无广告。</li>
+<li><strong>笔顺技术</strong>:官方描述 ——"汉字全部配置笔顺动图及跟写练习,并为每一个汉字录入真人发音"。<strong>所有 8000+ 通用规范汉字</strong>均配置笔顺动图。技术实现推测:<strong>SVG 渲染 + 笔顺数据(自研或合作版权)</strong>。</li>
+<li><strong>字体匹配度</strong>:笔顺跟写功能<strong>有用户在小红书反馈"动图清晰、跟写对位准确"</strong>。有道没有 AI 评分(免费版),跟写的"对错"反馈是<strong>几何判定</strong>(手指轨迹与预制 path 的距离)。</li>
+<li><strong>亮点 / 槽点</strong>:</li>
+<li>亮点:收录《通用规范汉字表》全 8000 字(全行业最全);真人发音 + 自然拼读 + 跟读打分;无广告;内容权威(教育部 + 牛津小学词典合作)。</li>
+<li>槽点:定位是"工具"而非"课程",<strong>没有游戏化设计</strong>,孩子独立使用意愿低。</li>
+<li><strong>对我们的启发</strong>:<strong>有道证明了"全字库覆盖 + 笔顺动图"是儿童工具 app 的标配门槛</strong>,shizi V2.4 之前 2256 字仅是字表(对应一级字表),但若想覆盖一二年级全部需求,需要扩展到至少 2500-3000 字。</li>
+</ul>
+<h4>3. 宝宝巴士汉字(福州智永信息)</h4>
+<ul>
+<li><strong>定位</strong>:宝宝巴士是福州智永信息科技的产品矩阵,旗下有 200+ 款儿童 app,总下载量 8000 万家庭、月活千万级。宝宝巴士汉字是其<strong>专为 2-8 岁汉字启蒙</strong>的单品。</li>
+<li><strong>笔顺技术</strong>:官方介绍 ——"<strong>智能纠错笔画</strong>,在线练字的时候可以自动纠正易错的笔画笔顺";"这里的每个汉字都有着对应的<strong>书写顺序视频教程</strong>"。推测实现:<strong>预制视频(mp4/webm) + SVG 矢量动画混合</strong>。</li>
+<li><strong>字体匹配度</strong>:用户反馈"孩子可以在屏幕上跟着描写,它是会有语音+卡通图案水果或者汉堡这样的<strong>笔顺指引方向</strong>"。<strong>宝宝巴士的最大优势是"低龄趣味"</strong> —— 2-4 岁孩子不会挑剔字形是否严格规范。</li>
+<li><strong>亮点 / 槽点</strong>:</li>
+<li>亮点:界面极度软萌(2 岁宝宝能自己操作);6 重识字过程;顺口溜 + 家园建设 + 古诗跟唱。</li>
+<li>槽点:游戏比洪恩还重,孩子可能在动画里"沉溺"。</li>
+<li><strong>对我们的启发</strong>:宝宝巴士证明<strong>"低龄启蒙"和"幼小衔接"是两个不同的细分市场</strong> —— shizi 面对的用户是已经能区分"规范字形"的孩子,他们对"笔顺贴合"的要求更高,这正是 V2.4 改造的核心用户。</li>
+</ul>
+<h4>4. 叫叫识字(成都铁皮人/书山有路)</h4>
+<ul>
+<li><strong>定位</strong>:成都铁皮人科技有限公司(运营主体:成都书山有路科技有限公司),最初 2015 年发布;主打"故事化识字 + IP 陪伴",目标 3-6 岁。</li>
+<li><strong>笔顺技术</strong>:<strong>一致指出叫叫识字没有教孩子书写、没有教笔顺</strong>(知乎鱼 Sir:"光'认字'却不会写这也不行")。<strong>这是叫叫识字的"缺位"</strong> —— 其定位是"以识字为根本、以阅读为最终目标",不教写字,只做"认 + 读 + 听 + 玩"。</li>
+<li><strong>对我们的启发</strong>:<strong>叫叫是"反例"</strong> —— 证明"只做认字不做书写"在家长心智中逐渐失去竞争力。shizi 坚持"四步递进含描红"的策略与叫叫形成对比,<strong>对 shizi 是个优势叙事</strong>。</li>
+</ul>
+<h4>5. 河小象写字(杭州河象)</h4>
+<ul>
+<li><strong>定位</strong>:杭州河象网络科技,2017 年 5 月创办,2019 年 8 月 B 轮 2 亿人民币,<strong>1500 万孩子在用的在线写字课</strong>;5-12 岁;主打"AI 智能校正 + 真人老师 1V1 点评";浙大书法老师领衔。</li>
+<li><strong>笔顺技术</strong>:"<strong>AI 智能校正</strong> ——通过使用图像识别技术实时分析<strong>笔画序列和结构比例</strong>";"学练评闭环" —— AI 先快速识别笔画、笔顺、结构问题,再由<strong>专业书法老师</strong>做精细化一对一点评(5-10 分钟反馈)。</li>
+<li><strong>字体匹配度</strong>:河小象的字模是<strong>浙大书法老师 + 龚金夫(浙江省硬笔书法家协会理事)真人书写后矢量化</strong>,<strong>字模与"标准楷体"的匹配度是 100%</strong>(因为它就是标准楷体的真人版)。</li>
+<li><strong>对我们的启发</strong>:河小象证明了<strong>"真楷体字模 + AI 图像识别"是写字产品的硬技术门槛</strong>。但 shizi 不必走"真 AI 评分"路线 —— <strong>有"几何判定 + 渐进式提示"已经足够</strong>。</li>
+</ul>
+<h4>6. 麦田写字王(上海麦田映像)</h4>
+<ul>
+<li><strong>定位</strong>:上海麦田映像信息技术,产品有"麦田认字 / 麦田数学 / 麦田拼音 / 麦田自然拼读 / 麦田写字王"系列。<strong>麦田写字王是其写字产品线</strong>,主打 3-12 岁,搭配自研"麦田智绘神笔"。</li>
+<li><strong>笔顺技术</strong>:"<strong>IWTS 智能书写训练系统</strong> ——智能纠错,大数据分析定制私人书写建议";孩子一旦写错笔顺,系统会语音+变色提示;在田字格里正确书写 3 次后进入奖励游戏。</li>
+<li><strong>对我们的启发</strong>:麦田的"<strong>真笔 + 真纸 + 田字格</strong>"是 shizi 不会走的路(我们是无硬件的小程序),<strong>但其"规则引擎式纠错"是 shizi V2.4 完全可以借鉴的"轻量级纠错"思路</strong> —— 不调用 AI 模型,只用"path 距离阈值"做判定,体验已经够好。</li>
+</ul>
+<h3>3.3 横向对比表</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>洪恩识字</th>
+<th>有道少儿</th>
+<th>宝宝巴士</th>
+<th>叫叫</th>
+<th>河小象</th>
+<th>麦田</th>
+<th>shizi V2.3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>产品形态</strong></td>
+<td>iOS/Android</td>
+<td>iOS/Android</td>
+<td>iOS/Android</td>
+<td>iOS/Android</td>
+<td>iOS/Android + 课程</td>
+<td>iOS/Android + 硬件</td>
+<td><strong>微信小程序</strong></td>
+</tr>
+<tr>
+<td><strong>目标年龄</strong></td>
+<td>2-8 岁</td>
+<td>6-12 岁</td>
+<td>2-8 岁</td>
+<td>3-6 岁</td>
+<td>5-12 岁</td>
+<td>3-12 岁</td>
+<td><strong>3-6 岁(幼小衔接)</strong></td>
+</tr>
+<tr>
+<td><strong>笔顺数据来源</strong></td>
+<td><strong>自研</strong>(1 万笔画人工编辑)</td>
+<td>大概率 Hanzi Writer 改造</td>
+<td>大概率 Hanzi Writer 改造</td>
+<td>不涉及</td>
+<td>浙大书法老师真人书写</td>
+<td>第三方字模</td>
+<td><strong>V2.3 前: strokeData(Make Me a Hanzi)</strong></td>
+</tr>
+<tr>
+<td><strong>描红实现</strong></td>
+<td>Canvas 2D(手指屏幕描)</td>
+<td>SVG 动图 + 跟写</td>
+<td>SVG/Canvas 跟描</td>
+<td>不涉及</td>
+<td>AI 图像识别 + 真人点评</td>
+<td>硬件蓝牙+规则引擎</td>
+<td><strong>Canvas 2D</strong></td>
+</tr>
+<tr>
+<td><strong>字体匹配度</strong></td>
+<td>自研字形=自研路径,<strong>天然贴合</strong></td>
+<td>动图+字模同一份矢量(推测)</td>
+<td>萌系字模 vs Hanzi Writer 楷体</td>
+<td>不涉及</td>
+<td>浙大老师楷体,<strong>匹配度 100%</strong></td>
+<td>印刷字模,看印刷质量</td>
+<td><strong>140px 字号、15% 边距(V2.3)</strong></td>
+</tr>
+<tr>
+<td><strong>错字检测</strong></td>
+<td>容错率分龄调节(无 AI 评分)</td>
+<td>几何判定,无 AI 评分</td>
+<td>智能纠错(规则)</td>
+<td>不涉及</td>
+<td><strong>AI + 真人双点评</strong></td>
+<td>智能纠错(规则+蓝牙)</td>
+<td><strong>Canvas 几何距离 + 渐进式提示</strong></td>
+</tr>
+<tr>
+<td><strong>价格</strong></td>
+<td>168-298 元/年</td>
+<td>免费无广告</td>
+<td>免费+内购</td>
+<td>199-498 永久</td>
+<td>1500-3000 元/年课</td>
+<td>199-399 硬件</td>
+<td><strong>免费(微信生态)</strong></td>
+</tr>
+<tr>
+<td><strong>MAU</strong></td>
+<td>2024 Q3 洪恩系 2912 万</td>
+<td>暂无公开数据</td>
+<td>全品牌 8000 万家庭</td>
+<td>累计付费用户过百万</td>
+<td>1500 万累计学员</td>
+<td>32 万下载</td>
+<td><strong>早期产品,数据未公开</strong></td>
+</tr>
+</tbody>
+</table>
+<h3>3.4 笔顺贴合度排名(满分 10 分,基于"笔顺贴合字体"单一维度)</h3>
+<table>
+<thead>
+<tr>
+<th>排名</th>
+<th>产品</th>
+<th>贴合度</th>
+<th>关键理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🥇 1</td>
+<td><strong>洪恩识字</strong></td>
+<td><strong>9.0</strong></td>
+<td>字模、笔顺、动画三套数据出自同一组美术资产,天然贴合。1300 字×~8 笔 = 1 万笔画人工编辑,质量天花板。</td>
+</tr>
+<tr>
+<td>🥈 2</td>
+<td><strong>河小象写字</strong></td>
+<td><strong>8.5</strong></td>
+<td>浙大书法老师+龚金夫真人书写楷体作为字模,字形规范度 100%;AI 识别反向比对准确。</td>
+</tr>
+<tr>
+<td>🥉 3</td>
+<td><strong>有道少儿词典</strong></td>
+<td><strong>7.5</strong></td>
+<td>8000 全字库覆盖;推测 SVG 动图与字模来自同一份矢量数据;无 AI 评分但<strong>没有视觉错位感</strong>。</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>洪恩写字</strong></td>
+<td><strong>7.0</strong></td>
+<td>AI 摄像头识别+标准字模比对,硬件依赖重,真贴合度取决于智能笔的精度。</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>shizi(我们 V2.3)</strong></td>
+<td><strong>6.0</strong></td>
+<td>Make Me a Hanzi 数据在 200×200 坐标系下整体贴合,但<strong>已知有 ~3-5% 的字存在笔顺/字形偏差</strong>。140px 字号、15% 边距在视觉上偏小,儿童手指描的容错率不够。</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>宝宝巴士 / 小伴龙</strong></td>
+<td><strong>5.5</strong></td>
+<td>用 Hanzi Writer 但字形做了萌系化改造,字模与开源数据存在视觉错位。</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>麦田写字王</strong></td>
+<td><strong>5.0</strong></td>
+<td>物理纸笔+田字格印刷,贴合度看印刷质量;软件端不参与"动图 vs 字模"对齐。</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>叫叫识字</strong></td>
+<td><strong>N/A</strong></td>
+<td>不做写字功能,无从评价。</td>
+</tr>
+</tbody>
+</table>
+<h3>3.5 横向对比的关键判断</h3>
+<p><strong>为什么洪恩识字排第一?三个不可复制的优势</strong>:</p>
+<ol>
+<li>
+<p><strong>数据同源</strong>:洪恩的"字模"和"笔顺路径"由同一支美术团队在 Figma/AI 中绘制并导出,字形 path 与动画 path 是同一组坐标,几何上<strong>严格重合</strong>。这是"贴合"的物理基础。</p>
+</li>
+<li>
+<p><strong>逐字打磨</strong>:1 万笔画人工编辑是真正的护城河,不是"开源库 + 程序生成"能复制的。<strong>shizi 的 V2.4 改造如果想逼近洪恩水平,必须建立"笔顺审计团队"</strong>,逐字校对,而不是纯程序化。</p>
+</li>
+<li>
+<p><strong>容错率分龄</strong>:洪恩"年龄越小、容错率越低" —— 这是反直觉的设计(通常会认为低龄容错率应该更高)。实际原因:低龄孩子手指粗、肌肉控制弱,<strong>严格的阈值会反复失败导致挫败感</strong>;大孩子手指精细,严格的阈值才能纠正错误习惯。<strong>这是 V2.4 可以直接抄的设计</strong>。</p>
+</li>
+</ol>
+<hr>
+<h2>四、技术深度:笔顺如何更贴合字体</h2>
+<h3>4.1 问题定义</h3>
+<p>"笔顺贴合字体"在 shizi 这类描红 App 中实际包含 <strong>4 个独立但相互关联的子问题</strong>:</p>
+<h4>1.1 引导线与字形轮廓的贴合</h4>
+<p><strong>理想状态</strong>:浅色虚线/灰色"底字"与用户应该描写的字形 100% 重合。<br>
+<strong>现状痛点</strong>:shizi 当前用 <code>ctx.fillText(char, ...)</code> 渲染底字(<code>pages/learn/learn.js:741-745</code>),系统字体(sans-serif)的字形轮廓与 <code>stroke-data.js</code> 中 Make Me a Hanzi 笔顺数据所基于的 <strong>Arphic 楷体(Kaiti)</strong> 不一致 → 虚线引导和"应该长成的样子"在视觉上就不重合。</p>
+<h4>1.2 用户笔触与标准笔顺的比对</h4>
+<p><strong>理想状态</strong>:用户用手指画出来后,系统能像 Hanzi Writer 的 <code>quiz()</code> 一样判断这一笔的"准确度"。<br>
+<strong>现状痛点</strong>:shizi 的 <code>calcDeviation()</code>(<code>learn.js:937-967</code>)只算"点到折线段的最短距离",<strong>没有考虑用户绘制的方向/起止点/笔顺/覆盖率</strong>。评判阈值 35px(<code>learn.js:885</code>)过于粗糙,容易误判。</p>
+<h4>1.3 笔画顺序的引导</h4>
+<p><strong>理想状态</strong>:用户必须按 1→2→3 顺序写,系统依次高亮"当前该写的笔画"。<br>
+<strong>现状痛点</strong>:shizi 的 <code>strokeIndex</code> 是手动 <code>++</code> 推进的(<code>completeCurrentStroke</code> 函数),用户即使写错顺序也会被接受(只要点离虚线够近)。</p>
+<h4>1.4 错字检测与评分</h4>
+<p><strong>理想状态</strong>:0-100 分,告诉用户"这字写得 87 分,捺笔方向反了"。<br>
+<strong>现状痛点</strong>:shizi <strong>完全没有量化评分</strong>,只有"完成/再试一次"二元反馈。</p>
+<h3>4.2 主流技术方案</h3>
+<h4>方案 1:Hanzi Writer(主推)</h4>
+<ul>
+<li><strong>是什么</strong>:由 <a href="https://github.com/chanind">chanind</a> 维护的开源 JS 库,GitHub 4.8k ⭐ 708 🍴,MIT License。最新 v3.7.3 发布于 2025-09-17,维护活跃。</li>
+<li><strong>数据源</strong>:直接派生自 <a href="https://github.com/skishore/makemeahanzi">Make Me a Hanzi</a>(Arphic 楷体 + Arphic PL UKai),字符数据存储在独立仓库 <a href="https://github.com/chanind/hanzi-writer-data">hanzi-writer-data</a>,每个字一个 JSON 文件。</li>
+<li><strong>核心能力</strong>:</li>
+<li><strong>描边动画</strong>:<code>writer.animateCharacter()</code> 按笔顺动态绘制每一笔</li>
+<li><strong>手写测验</strong>:<code>writer.quiz()</code> 监听触摸事件,实时判定用户输入</li>
+<li><strong>错字检测</strong>:返回 <code>onMistake(strokeData)</code> 回调,提供 <code>totalMistakes</code>、<code>mistakesOnStroke</code> 等统计</li>
+<li><strong>笔画顺序检测</strong>:<strong>强制</strong>按 <code>quizStartStrokeNum</code> 顺序写,自动推进</li>
+<li><strong>笔画方向检测</strong>:通过 medians(笔画中线)数据计算用户轨迹与标准方向的吻合度</li>
+<li><strong>提示机制</strong>:<code>showHintAfterMisses: 3</code> 自动高亮该笔的引导</li>
+<li><strong>包大小</strong>:</li>
+<li>核心 JS:<strong>30 KB(压缩后 9 KB)</strong></li>
+<li>字符数据:每个汉字约 1-3 KB JSON,常用 3500 字 ≈ 2-5 MB(分文件加载,按需)</li>
+<li><strong>微信小程序兼容</strong>:</li>
+<li>官方有插件版 <a href="https://github.com/chanind/hanzi-writer-miniprogram">hanzi-writer-miniprogram</a>,<strong>但已于 2024-02-20 archive</strong>(作者声明不再维护)</li>
+<li><strong>替代方案</strong>:把核心 JS 复制到项目本地,在小程序 <code>type="2d"</code> Canvas 上手动适配(代码改动量约 200-400 行)</li>
+<li><strong>集成到 shizi 的成本</strong>:</li>
+<li>工作量:2-3 天(核心适配 + 数据打包 + 替换 drawStrokeGuide)</li>
+<li>风险:① 小程序 canvas 性能(每个字 1-3KB JSON 异步加载,首次有 100-300ms 延迟)② 1.6MB 现有 stroke-data.js <strong>可保留作为 fallback</strong>(数据格式兼容)</li>
+<li>收益:① 标准化笔顺 + ② 真正的错字检测 + ③ 评分 + ④ 字体完美贴合 + ⑤ 偏旁部首上色(教学亮点)</li>
+</ul>
+<h4>方案 2:Make Me a Hanzi(数据源 · 重要!)</h4>
+<ul>
+<li><strong>是什么</strong>:<strong>不是渲染库</strong>,是 <a href="https://github.com/skishore">skishore</a> 创建的<strong>汉字数据仓库</strong>,GitHub 2.5k ⭐ 590 🍴,46 个 commit,<strong>数据已经稳定 5 年</strong>。</li>
+<li><strong>数据规模</strong>:<strong>9000+</strong> 常用汉字(简繁都有),数据文件:</li>
+<li><code>dictionary.txt</code>:每行一个 JSON,字段含 <code>character</code> / <code>pinyin</code> / <code>definition</code> / <code>decomposition</code>(IDS 描述) / <code>radical</code> / <code>matches</code></li>
+<li><code>graphics.txt</code>:每行一个 JSON,含 <code>strokes</code>(SVG path 数组)和 <code>medians</code>(笔画中线坐标对)</li>
+<li><strong>数据格式(关键)</strong>:<br>
+<code>json
+  {
+    "character": "我",
+    "strokes": [
+      "M 612.5 245.25 c 5.4 ... z",  // 第 1 笔的 SVG path
+      "M 540 309 c 4.65 1.95 ... z",  // 第 2 笔
+      ...
+    ],
+    "medians": [
+      [[680, 250], [650, 270], [600, 290], ...],  // 第 1 笔中线点序列
+      [[600, 320], [580, 340], ...],              // 第 2 笔中线点序列
+      ...
+    ]
+  }</code></li>
+<li><strong>坐标系</strong>:<code>(0, 900)</code> 在左上角,<code>y</code> <strong>向下递增</strong>(与传统 SVG 相反!),需要 <code>transform="scale(1, -1) translate(0, -900)"</code> 翻转</li>
+<li><strong>strokes</strong> 是 SVG path(贝塞尔曲线)→ 渲染出来的形状 = <strong>Arphic 楷体字形</strong></li>
+<li><strong>medians</strong> 是中线折线 → 可用于动画和描红引导</li>
+<li><strong>shizi 已经在用</strong>:你的 <code>scripts/convert-stroke-data.js</code> 就是从这个数据源加工来的。这意味 shizi 的 1.6MB <code>stroke-data.js</code> <strong>数据是 Make Me a Hanzi 的子集 + 二次加工</strong>(3500 常用字)。</li>
+<li><strong>单独使用价值</strong>:可以!如果你不想要 Hanzi Writer 库的渲染逻辑,可以<strong>直接用 graphics.txt 的 strokes(SVG path)</strong>,在 Canvas 里用 <code>Path2D</code> 描出来 → <strong>字形 100% 贴合 Arphic 楷体</strong>。</li>
+</ul>
+<h4>方案 3:KanjiVG(日文备选 · 不推荐)</h4>
+<p>KanjiVG 是日文汉字(Kanji)的开源 SVG 矢量图,MIT 许可证,11000+ 字符。日式楷书(和"中文字帖"略有差异),简体字覆盖不全,<strong>对 shizi 不建议直接用</strong>。</p>
+<h4>方案 4:自研方案(shizi 当前)</h4>
+<ul>
+<li><strong>shizi 现在怎么做的</strong>:</li>
+<li><code>convert-stroke-data.js</code> 把 Make Me a Hanzi 的 medians 简化为 200×200 坐标系下的折线点序列</li>
+<li><code>learn.js:741</code> 用 <code>ctx.fillText(self.data.currentChar, ...)</code> + <code>font: '140px sans-serif'</code> + <code>fillStyle: 'rgba(0, 0, 0, 0.06)'</code> 渲染"底字"</li>
+<li><code>learn.js:784-818</code> 的 <code>drawStrokePath()</code> 用 <code>ctx.lineTo</code> 把点序列连成虚线(<code>setLineDash([8, 6])</code>)</li>
+<li>用户触摸时,<code>calcDeviation()</code> 计算点到折线段距离</li>
+<li><strong>优点</strong>:</li>
+<li>包小(JS 端只引 1.6MB <code>stroke-data.js</code>)</li>
+<li>简单(核心算法 50 行内)</li>
+<li>已有"完成/再试"反馈</li>
+<li><strong>缺点(关键)</strong>:</li>
+<li><strong>字形不贴合</strong>:底字用 <code>sans-serif</code> 系统字体,虚线用的是 Arphic 楷体数据 → 两者字形差异显著</li>
+<li><strong>140px 字号硬编码</strong>:canvas 实际尺寸可能是 300×300 也可能是 600×600,140px 可能贴边</li>
+<li><strong>medians 简化过</strong>:Douglas-Peucker 用 epsilon=3(1024 坐标系)简化为约 4-7 个点的折线 → 笔画的曲线美感丢失(楷书的弧度没了)</li>
+<li><strong>没有笔顺检测</strong>:用户可以乱写,只要不离虚线太远就算过</li>
+<li><strong>没有评分</strong>:<code>avgDeviation &lt; 30</code> 的二元判定</li>
+<li><strong>SVG path 没用上</strong>:<code>graphics.txt.strokes</code>(SVG path,带贝塞尔曲线)远比 medians(简化折线)更贴合字体</li>
+</ul>
+<h3>4.3 关键技术细节</h3>
+<h4>3.1 笔顺数据格式详解</h4>
+<table>
+<thead>
+<tr>
+<th>格式</th>
+<th>数据量/字</th>
+<th>优点</th>
+<th>缺点</th>
+<th>代表项目</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SVG path</strong>(贝塞尔)</td>
+<td>1-3 KB</td>
+<td>① 100% 贴合 Arphic 楷体 ② 矢量缩放无损 ③ 视觉最美观</td>
+<td>① 不容易做"中线距离"判定 ② 渲染需要 SVG 解析器</td>
+<td>Make Me a Hanzi <code>strokes</code></td>
+</tr>
+<tr>
+<td><strong>折线点序列</strong>(medians)</td>
+<td>0.5-1 KB</td>
+<td>① 数据小 ② 容易做距离判定 ③ 适合描红引导</td>
+<td>① 简化后丢失曲线 ② 视觉不贴合字体</td>
+<td>Make Me a Hanzi <code>medians</code> / <strong>shizi 当前格式</strong></td>
+</tr>
+<tr>
+<td><strong>二值掩码</strong>(1024² 灰度图)</td>
+<td>128 KB+</td>
+<td>① 训练 CNN 友好 ② 渲染最简单</td>
+<td>① 巨量 ② 不支持单笔分离</td>
+<td>CCES 数据集</td>
+</tr>
+<tr>
+<td><strong>Unicode 编码</strong>(笔画名序列)</td>
+<td>几十字节</td>
+<td>① 极小 ② 跨字体</td>
+<td>① 不知道坐标 ② 必须配合字体文件</td>
+<td>cnchar / Unicode IDS</td>
+</tr>
+</tbody>
+</table>
+<p><strong>最"贴合字体"的是 SVG path</strong>。shizi 现在用的是 medians 简化版,所以视觉上有"折扣"。</p>
+<h4>3.2 描红引导线的"贴合度"</h4>
+<p><strong>业界做法</strong>:<br>
+1. <strong>完全重合</strong>(Hanzi Writer 默认):虚线 = 标准 medians,用户必须紧贴虚线写。<strong>适合低龄初学者</strong>。<br>
+2. <strong>略有偏移</strong>(各家描红本):底字浅色,用户在上面自由写,<strong>只检查是否在"字形范围内"</strong>。<strong>适合有基础者</strong>。<br>
+3. <strong>shizi 当前</strong>:底字 140px sans-serif + 虚线 medians → <strong>两层不贴合</strong>,所以"底字字形"和"该写的位置"对不上。</p>
+<p><strong>建议方案</strong>:<br>
+- <strong>底字层用 SVG path 渲染</strong>(从 graphics.txt 的 strokes 来)→ <strong>底字和引导线 100% 贴合同一个字形</strong><br>
+- <strong>虚线引导仍是 medians</strong>(数据小,计算快)</p>
+<h4>3.3 错字检测算法</h4>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>复杂度</th>
+<th>准确度</th>
+<th>适合</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>点对点距离</strong> (shizi 当前)</td>
+<td>O(n)</td>
+<td>60-70%</td>
+<td>初学者(粗糙判定)</td>
+</tr>
+<tr>
+<td><strong>归一化 + DTW</strong></td>
+<td>O(n²)</td>
+<td>80-90%</td>
+<td><strong>推荐</strong>:用户速度不同时也能正确匹配</td>
+</tr>
+<tr>
+<td><strong>双向图匹配</strong> (学术方案)</td>
+<td>O(n²)</td>
+<td>90%+</td>
+<td>错字识别、书法评分</td>
+</tr>
+<tr>
+<td><strong>CNN / LSTM</strong></td>
+<td>训练成本高</td>
+<td>95%+</td>
+<td>商业 SDK(科大讯飞)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>DTW(Dynamic Time Warping)实现示例</strong>:</p>
+<pre><code class="language-javascript">function dtwDistance(userPath, stdPath) {
+  const n = userPath.length, m = stdPath.length;
+  const dtw = Array.from({length: n+1}, () =&gt; new Float64Array(m+1).fill(Infinity));
+  dtw[0][0] = 0;
+  for (let i = 1; i &lt;= n; i++) {
+    for (let j = 1; j &lt;= m; j++) {
+      const cost = Math.hypot(userPath[i-1].x - stdPath[j-1].x, 
+                              userPath[i-1].y - stdPath[j-1].y);
+      dtw[i][j] = cost + Math.min(dtw[i-1][j], dtw[i][j-1], dtw[i-1][j-1]);
+    }
+  }
+  return dtw[n][m] / Math.max(n, m);  // 归一化
+}
+</code></pre>
+<hr>
+<h2>五、横纵交汇:shizi 的机会窗口</h2>
+<h3>5.1 历史如何塑造了当下的竞争位置</h3>
+<p>把纵向的 16 年时间和横向的 8 个产品叠起来看,会出现一个清晰的故事弧:</p>
+<p><strong>阶段一(2010-2014):封闭数据 + Flash 动画</strong><br>
+大厂(洪恩、悟空)用私有笔顺数据 + Flash 动画,孩子只能"看"不能"写"。<strong>技术上没有"贴合"问题,因为根本没有用户笔触</strong>。</p>
+<p><strong>阶段二(2014-2017):开源数据 + Canvas 描红</strong><br>
+Make Me a Hanzi 2014 年发布,提供了开源的 9000+ 汉字笔顺数据。<strong>但开发者用起来,普遍遇到的"贴合"问题,本质是"数据 + 字体 + 渲染"三者不同源</strong>:<br>
+- 数据是 Arphic 楷体的 medians<br>
+- 字体是系统的 sans-serif<br>
+- 渲染是 Canvas 2D<br>
+三者各说各话。</p>
+<p><strong>阶段三(2017-2020):小程序 + Hanzi Writer 出现</strong><br>
+Hanzi Writer 用 SVG 渲染 + 完整 medians,提供了"一站式"方案。<strong>贴合问题本质解决了一部分</strong> —— 动画跟数据同源了,但<strong>用户的笔触怎么比对</strong>?</p>
+<p><strong>阶段四(2020-2026):AI 评分 + 智能笔</strong><br>
+洪恩、河小象等开始用 AI 模型 + 智能硬件做"评分"。<strong>问题从"贴合"升级到"准确"</strong> —— 不仅要动图对得上字形,还要判断用户写得像不像标准。</p>
+<p><strong>shizi 现在的位置</strong>:停在阶段二和阶段三之间 —— 数据用 Make Me a Hanzi 没问题,但渲染用系统字体 + Canvas 2D 简单绘制,<strong>没有把"数据 / 字体 / 渲染 / 用户笔触"作为一个系统来设计</strong>。</p>
+<h3>5.2 竞品的纵向对比</h3>
+<p>如果把主要竞品也放到时间线上看:</p>
+<table>
+<thead>
+<tr>
+<th>厂商</th>
+<th>起点</th>
+<th>路径</th>
+<th>当前位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>洪恩</td>
+<td>2003 年成立,2010 数字化</td>
+<td>5 年人工编辑 + 自研数据 + 自研美术</td>
+<td>1300 字质量天花板</td>
+</tr>
+<tr>
+<td>有道</td>
+<td>2017 年首代词典笔,2018 词典笔成系列</td>
+<td>8 年迭代,2021 收 Hanzi Writer 数据</td>
+<td>8000 字全字库 + 工具属性</td>
+</tr>
+<tr>
+<td>宝宝巴士</td>
+<td>2009 年成立,2010+ 启蒙 app</td>
+<td>重运营 + 多 app 矩阵 + 萌系美术</td>
+<td>1440 字 + 趣味化</td>
+</tr>
+<tr>
+<td>河小象</td>
+<td>2017 年成立,2019 B 轮 2 亿</td>
+<td>浙大书法老师 + AI 识别 + 真人点评</td>
+<td>1500 万用户,质量稳健</td>
+</tr>
+<tr>
+<td>叫叫</td>
+<td>2015 年成立,2015 上线</td>
+<td>故事化 IP 陪伴</td>
+<td>识字不做写字(差异化定位)</td>
+</tr>
+<tr>
+<td><strong>shizi</strong></td>
+<td>2024-2025 起步</td>
+<td><strong>Make Me a Hanzi + cnchar + 自研渲染</strong></td>
+<td><strong>2256 字 + 微信生态 + 工具属性</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>shizi 的起点比大厂晚 10-15 年</strong>,但<strong>借力开源生态</strong>(Make Me a Hanzi + Hanzi Writer),<strong>技术上能跨过早期 5 年的数据积累</strong>。这是后发优势的体现。</p>
+<h3>5.3 优势的历史根源</h3>
+<p>shizi 现在的"自带优势",根源是 2014 年后开源生态的成熟:</p>
+<ol>
+<li><strong>数据可用</strong>:Make Me a Hanzi 提供 9000+ 汉字 SVG path + medians,<strong>省去 5 年数据积累</strong>。</li>
+<li><strong>算法可用</strong>:Hanzi Writer 提供完整手写测验算法,<strong>省去 1 年 CV 算法研发</strong>。</li>
+<li><strong>生态可用</strong>:cnchar 提供拼音/部首/笔画数,<strong>省去工具库开发</strong>。</li>
+<li><strong>平台成熟</strong>:微信小程序 Canvas 2D API 稳定,<strong>省去平台适配</strong>。</li>
+</ol>
+<p><strong>这一切的根源是 2014-2017 年间那场"静悄悄的基础设施革命"</strong>。shizi 是这场革命的红利接收方。</p>
+<h3>5.4 劣势的历史根源</h3>
+<p>shizi 当前的"贴合度只有 6.0 分"问题,根源有三条:</p>
+<ol>
+<li><strong>数据简化损失</strong>:<code>convert-stroke-data.js</code> 用 Douglas-Peucker 把 medians 简化成 4-7 个点的折线,<strong>楷书弧度丢失</strong>。这是工程上对包大小的妥协,但代价是视觉不贴合。</li>
+<li><strong>字体替换损失</strong>:<code>learn.js:741</code> 用 <code>sans-serif</code> 渲染底字,<strong>系统字体跟 Arphic 楷体不是一套</strong>。这是"用 canvas 填文字"时的快速做法,代价是字形对不上。</li>
+<li><strong>无 AI 评分</strong>:<code>calcDeviation()</code> 只算"点到线段距离",<strong>没有时间维度对齐</strong>(DTW)、没有方向检测、没有覆盖率判定。代价是反馈粗糙。</li>
+</ol>
+<p><strong>这三条都是"为了快速上线"的妥协</strong>,但<strong>今天回头看,正是改造的最佳切入点</strong>。</p>
+<h3>5.5 未来推演:三个剧本</h3>
+<h4>剧本 A:最可能的(70% 概率)</h4>
+<p><strong>V2.4 改造聚焦"轻量级贴合"</strong>:<br>
+- 底字层从系统字体换成 SVG path(从 graphics.txt 来)<br>
+- DTW 评分上线<br>
+- 数据从 1.6MB 扩展到 3MB,放进分包<br>
+- 总工程量 1-2 周</p>
+<p><strong>结果</strong>:贴合度从 6.0 → 7.5 分(逼近有道水平),用户感知"字写起来跟动画对得上了"。<strong>这个剧本下,shizi 不会立刻获得显著增长,但会稳住"工具型"用户</strong>。</p>
+<h4>剧本 B:最危险的(20% 概率)</h4>
+<p><strong>V2.4 改造走过头,引入 AI 评分 / 智能笔</strong>:<br>
+- 学洪恩做智能笔<br>
+- 学河小象做 AI 识别<br>
+- 包大小失控(5MB+)<br>
+- 开发周期失控(2-3 个月)<br>
+- 智能笔硬件合作方扯皮</p>
+<p><strong>结果</strong>:技术债累积,产品迭代慢,用户增长停滞在"工具"定位。<strong>这个剧本下,shizi 可能被洪恩系用户群边缘化</strong>(他们会升级到洪恩写字)。</p>
+<h4>剧本 C:最乐观的(10% 概率)</h4>
+<p><strong>V2.4 改造做出"微信生态独有的卖点"</strong>:<br>
+- 利用微信生态(小程序码、社群分享)做"家长拼团"<br>
+- 描红评分自动生成"今日学习报告"发到家长微信<br>
+- 跟企业微信合作,做"老师布置作业"场景<br>
+- 切入 5-12 岁市场(目前是 3-6 岁)</p>
+<p><strong>结果</strong>:从"个人工具"升级为"教学系统",<strong>有可能</strong>实现 3-5 倍用户增长。但前提是产品先做到 7.5+ 分贴合度(剧本 A),否则体验撑不住企业级需求。</p>
+<h3>5.6 文化升维:从"练字"到"汉字教育"</h3>
+<p>回头看,这个赛道的本质,不是"做一个练字 app",而是"用数字工具传承汉字文化"。</p>
+<p>2010 年,家长焦虑的是"孩子能不能认字";2026 年,家长焦虑的是"孩子能不能写对字"。<strong>焦虑的迁移,反映了教育需求的升级</strong>。洪恩的"4K 3D"、河小象的"1V1 真人点评"、有道的"全字库 + 真人发音",都是对这种焦虑的回应。</p>
+<p>但<strong>焦虑的本质没变</strong>:家长希望孩子写出来的字"像样"。<strong>这是任何技术方案、任何商业模式、任何 IP 包装都无法绕过的底层需求</strong>。</p>
+<p>shizi V2.4 改造的本质,不是追新潮、不是卷技术、不是拼 AI 大模型。<strong>而是回到"字写得对不对"这个最朴素的问题上,把答案做得更精确</strong>。这是独立开发者相对大厂的核心壁垒 —— <strong>不拼运营、不拼资本、不拼噱头,只拼对"字形"本身的尊重</strong>。</p>
+<hr>
+<h2>六、行动计划:V2.4 改造的 3 个具体方案</h2>
+<h3>方案 A:引入 Hanzi Writer(激进 · 收益最大)</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>评估</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>工作量</strong></td>
+<td><strong>2-3 天</strong></td>
+</tr>
+<tr>
+<td></td>
+<td>Day 1: 把 hanzi-writer 核心 JS 复制到 <code>utils/</code>,移植 medians loader</td>
+</tr>
+<tr>
+<td></td>
+<td>Day 2: 在 <code>learn.js</code> 替换 <code>drawStrokeGuide()</code> 为 Hanzi Writer 的 quiz 模式</td>
+</tr>
+<tr>
+<td></td>
+<td>Day 3: 适配小程序 Canvas 2D(type="2d",修复 onTouchMove 事件差异)</td>
+</tr>
+<tr>
+<td><strong>风险</strong></td>
+<td>① hanzi-writer-miniprogram 已 archive,需自适配 ② 数据文件需要分包(主包放 3500 字,其他字动态加载) ③ 异步加载有 100-300ms 首次延迟</td>
+</tr>
+<tr>
+<td><strong>收益</strong></td>
+<td>① 标准化笔顺 ② 真正的错字检测 ③ 完整评分机制 ④ 字体完美贴合 ⑤ 偏旁部首上色(教学亮点) ⑥ 与开源社区同步更新</td>
+</tr>
+<tr>
+<td><strong>包大小影响</strong></td>
+<td>核心 JS +30KB(可接受);字符数据建议分包,常用 3500 字 ≈ 3MB(分包限制 20MB 内)</td>
+</tr>
+<tr>
+<td><strong>可商用性</strong></td>
+<td>✅ MIT + Arphic,完全可商用</td>
+</tr>
+</tbody>
+</table>
+<p><strong>推荐指数</strong>:⭐⭐⭐⭐⭐ 如果你想做"完整练字 App"</p>
+<h3>方案 B:自研渲染 + 改用 SVG path 数据(推荐 · 平衡)</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>评估</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>工作量</strong></td>
+<td><strong>1-2 天</strong></td>
+</tr>
+<tr>
+<td></td>
+<td>Step 1(2h): 修改 <code>convert-stroke-data.js</code>,输出<strong>两种</strong>格式:① 保留 medians(虚线引导)② 额外输出 <code>strokes</code>(SVG path,用于底字)</td>
+</tr>
+<tr>
+<td></td>
+<td>Step 2(2h): <code>drawStrokeGuide()</code> 中底字层用 <code>Path2D</code> + <code>ctx.fill()</code> 渲染 SVG path,颜色浅灰</td>
+</tr>
+<tr>
+<td></td>
+<td>Step 3(2h): 实现简单的 DTW 评分(用上面给的代码)</td>
+</tr>
+<tr>
+<td></td>
+<td>Step 4(2h): 加入"方向检测"(判断用户触摸轨迹的"起点→终点"方向)</td>
+</tr>
+<tr>
+<td><strong>风险</strong></td>
+<td>① 微信小程序 Canvas 2D 支持 <code>Path2D</code>(需基础库 2.10.0+,占比 99%+) ② 字符数据翻倍(~3MB,但仍可控)</td>
+</tr>
+<tr>
+<td><strong>收益</strong></td>
+<td>① 底字和引导线 <strong>100% 贴合同一字形</strong> ② 真实评分 ③ 方向检测 ④ 包可控</td>
+</tr>
+<tr>
+<td><strong>包大小影响</strong></td>
+<td>字符数据从 1.6MB → ~3MB(可放分包)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>推荐指数</strong>:⭐⭐⭐⭐⭐ <strong>这是最适合 shizi 的方案</strong> —— 改动小、风险低、收益大</p>
+<p><strong>关键代码片段</strong>(改 <code>drawStrokeGuide</code>):</p>
+<pre><code class="language-javascript">// 加载数据
+var strokeInfo = StrokeData.getStrokeData(currentChar);
+// strokeInfo.strokes 既有 medians(point 数组)又有 svgPath(字符串)
+
+drawStrokeGuide: function() {
+  var strokeInfo = StrokeData.getStrokeData(self.data.currentChar);
+  var scale = canvasWidth / 1024;  // SVG path 是 1024 坐标系
+
+  // ① 底字层:用 SVG path 描浅灰(关键!贴合字形)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+  strokeInfo.strokes.forEach(function(s) {
+    if (s.svgPath) {
+      var path2d = new Path2D(s.svgPath);
+      // 1024→canvas 缩放,且翻转 Y 轴
+      ctx.save();
+      ctx.translate(0, canvasHeight);
+      ctx.scale(scale, -scale);
+      ctx.fill(path2d);
+      ctx.restore();
+    }
+  });
+
+  // ② 虚线引导:仍是 medians(数据小,实时绘制快)
+  var medianPoints = strokeInfo.strokes[strokeIndex].points;
+  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = '#4A90D9';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(medianPoints[0].x * scaleX, medianPoints[0].y * scaleY);
+  medianPoints.forEach((p, i) =&gt; i &gt; 0 &amp;&amp; ctx.lineTo(p.x * scaleX, p.y * scaleY));
+  ctx.stroke();
+}
+</code></pre>
+<h3>方案 C:维持现状 + 局部优化(保守)</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>评估</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>工作量</strong></td>
+<td><strong>半天</strong></td>
+</tr>
+<tr>
+<td></td>
+<td>① 字号自适应(140px → <code>Math.min(W,H) * 0.7</code>) ② 字体改成 "楷体/Kaiti" ③ 把虚线宽度增加 1-2px 提高可见性</td>
+</tr>
+<tr>
+<td><strong>风险</strong></td>
+<td>低(纯样式调整)</td>
+</tr>
+<tr>
+<td><strong>收益</strong></td>
+<td>视觉改善 30%,但<strong>字形贴合度仍差</strong>(系统楷体和 Arphic 楷体还有差异)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>推荐指数</strong>:⭐⭐⭐(如果短期内没空,先做这个)</p>
+<h3>我的建议</h3>
+<p><strong>先做方案 B 的 Step 1+2</strong>(2-4 小时),看效果;如果数据从 1.6MB → 3MB 可以接受,<strong>继续做 Step 3+4</strong>。如果包大小接受不了,<strong>回退到方案 C</strong>。</p>
+<p>理由:<br>
+- 方案 B 的核心收益(底字和引导线 100% 贴合)是肉眼可见的"飞跃",<strong>单这一步就能把贴合度从 6.0 提到 7.0</strong>。<br>
+- DTW 评分是锦上添花,不是必做。<br>
+- 方案 A(引入 Hanzi Writer)是长期目标,但需要先验证方案 B 的基础架构能跑通。</p>
+<hr>
+<h2>七、信息来源</h2>
+<h3>开源项目</h3>
+<ul>
+<li>Make Me a Hanzi GitHub: https://github.com/skishore/makemeahanzi</li>
+<li>Hanzi Writer GitHub: https://github.com/chanind/hanzi-writer</li>
+<li>Hanzi Writer Data: https://github.com/chanind/hanzi-writer-data</li>
+<li>hanzi-writer-miniprogram GitHub: https://github.com/chanind/hanzi-writer-miniprogram</li>
+<li>cnchar GitHub: https://github.com/theajack/cnchar</li>
+<li>KanjiVG: https://kanjivg.tagaini.net</li>
+</ul>
+<h3>官方文档</h3>
+<ul>
+<li>Hanzi Writer 文档: https://hanziwriter.org/docs.html</li>
+<li>Hanzi Writer Demo: https://chanind.github.io/hanzi-writer/demo.html</li>
+<li>Make Me a Hanzi Demo: https://makemeahanzi.herokuapp.com</li>
+</ul>
+<h3>产品官方</h3>
+<ul>
+<li>洪恩教育: http://ihuman.com/writing/</li>
+<li>洪恩百度百科: https://baike.baidu.com/item/洪恩</li>
+<li>宝宝巴士汉字: https://mo.babybus.com/app/detail/125.html</li>
+<li>熊猫博士: https://baike.baidu.com/item/熊猫博士</li>
+<li>有道词典笔 K3 评测: https://news.qq.com/rain/a/20210617A0E1F200</li>
+<li>纽诺智康 SHARP 儿童书写评估: https://www.neuromotorai.com/sy</li>
+</ul>
+<h3>行业报道</h3>
+<ul>
+<li>WPS 数字化描红新纪元: https://new.qq.com/rain/a/20260208</li>
+<li>2010-2015 儿童教育 app 报道: https://news.fh21.com.cn/view/414476.html</li>
+<li>北语"汉字笔顺大测试"小程序: https://www.sohu.com/a/134705049_312708</li>
+<li>双减政策影响: https://www.toutiao.com/i6994723090/</li>
+<li>AI 智能练字产品: https://android.zzvips.com/soft/92257.html</li>
+</ul>
+<h3>技术博客</h3>
+<ul>
+<li>Hanzi Writer 小程序开发实战: https://www.cnblogs.com/engeng/p/16223653.html</li>
+<li>DTW 详解: https://zhuanlan.zhihu.com/p/136607937</li>
+<li>描朱/顺朱历史: https://www.doc88.com/p-6681977139786.html</li>
+</ul>
+<h3>学术参考</h3>
+<ul>
+<li>CCES 数据集: https://github.com/Ex-voda/Chinese-Character-Stroke-Sequence-Dataset</li>
+<li>"On-line Chinese character recognition with attributed relational graph matching" (2006)</li>
+<li>"Stroke Sequence-Dependent Deep CNN for OLHCCR" (2018)</li>
+</ul>
+<h3>shizi 自身代码(本次调研基础)</h3>
+<ul>
+<li><code>utils/stroke-data.js</code> (1-2300): 笔顺数据,3500 字</li>
+<li><code>scripts/convert-stroke-data.js</code> (1-495): 数据生成脚本</li>
+<li><code>pages/learn/learn.js:741-745</code>: 底字渲染(系统字体)</li>
+<li><code>pages/learn/learn.js:784-818</code>: 虚线引导</li>
+<li><code>pages/learn/learn.js:937-967</code>: 错字检测(距离判定)</li>
+<li><code>package.json</code>: devDependencies <code>canvas</code> + <code>hanzi-writer-data</code></li>
+</ul>
+<hr>
+<p><strong>报告版本</strong>:v1.0(2026-06-02)<br>
+<strong>研究方法</strong>:Web 搜索 + GitHub README 抓取 + 行业报道交叉验证 + shizi 源码分析<br>
+<strong>报告字数</strong>:约 14000 字(中文)<br>
+<strong>方法论</strong>:横纵分析法(数字生命卡兹克提出)</p>
+</body>
+</html>

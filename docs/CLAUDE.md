@@ -100,7 +100,7 @@ E:/claude/PMRD/shizi/
 
 ## 云函数接口 (main)
 
-> **当前数量：22 个 action**（截至 V2.3）。所有业务逻辑统一在 `cloudfunctions/main/index.js` 的 switch 路由里，按"用户/学习/复习/统计/语音/运维"六类分。
+> **当前数量：23 个 action**（截至 V2.4 阶段 2）。所有业务逻辑统一在 `cloudfunctions/main/index.js` 的 switch 路由里，按"用户/学习/复习/统计/语音/运维"六类分。
 
 | action | 说明 | 参数 |
 |--------|------|------|
@@ -132,6 +132,7 @@ E:/claude/PMRD/shizi/
 | `cleanReviewLogs` | R-16 清洗 V2.1 之前的假阳性 review_logs（打 `data_quality="unreliable_pre_fix"` 标签） | { cutoffDate, dryRun, batchSize } |
 | `sendReviewReminder` | 定时器触发，订阅用户推送复习提醒 | （定时器或手动） |
 | `resetUserData` | **V2.3 危险操作**：清空当前用户所有学习数据。生产路径用 `{ confirm: true }`（用 wxContext.OPENID 锁定）；云端调试需 `{ devMode: true, openid, confirm: true }` | { confirm, devMode?, openid? } |
+| `getStrokeData` | **V2.4 阶段 2**：返回单字笔顺数据（points + direction + svgPath）。前端异步加载底字用。单字查：`{ char: "住" }`；批量查：`{ char: "住\|任\|主" }`（用 \| 分隔，返回 hit/miss/data） | { char } |
 
 ## V2.0 愉悦体验引擎 (utils/delight.js)
 
@@ -188,6 +189,69 @@ this.setData(Object.assign({
 
 **为什么需要它：** 修复 V2.2 上线后"上一个字学完直接进入下一个字时残留 learnCompleted=true"导致的"学会了"弹窗 bug（V2.3 修复 1）。
 
+## V2.4 新增工具
+
+### 描红字形贴合架构（V2.4 阶段 1 + 阶段 2）
+
+**问题：** 原版描红底字用系统 `sans-serif` 字体渲染，跟 `stroke-data.js` 用的 Arphic 楷体（Make Me a Hanzi 数据源）字形不一致 → "底字字形"和"虚线引导"对不上，儿童描红时方向/位置偏差明显。
+
+**V2.4 阶段 1（已上线）：** 切换到系统楷体
+- `pages/learn/learn.js` 底字字体从 `'140px sans-serif'` 改为 `'140px "Kaiti", "STKaiti", "楷体", serif'`
+- 改善但有上限：系统楷体各家略有差异，**无法 100% 贴合** Arphic 楷体
+- 字号 `140px` 保留 V2.3 修复值（预留 15% 边距避免贴框）
+
+**V2.4 阶段 2（Day 1+2 已实现，待用户验收）：** 用 SVG path 渲染底字
+- 数据：2256 个 JSON 拆到 `cloudfunctions/main/strokeCache/<字>.json`（每字 1-3KB，含 `svgPath`）
+- 主包 `utils/stroke-data.js` 保持 1.6MB（无 svgPath）以装下 2MB 限制
+- `pages/learn/learn.js` 加 `loadStrokeData(char)` 和 `preloadStrokeData(chars)` 异步函数
+- `initStep3` 流程：先用本地 medians 显示（无白屏）→ 异步拉云函数 strokeCache 升级 strokePaths → 拉到失败 fallback 同步数据
+- 关键代码路径：`loadStrokeData` 查 `wx.getStorageSync` 本地缓存 → 缓存未命中调 `wx.cloud.callFunction({name: 'main', data: {action: 'getStrokeData', data: {char}}})` → 拉到的数据 `wx.setStorageSync` 写回缓存
+
+**为什么拆 JSON 不放主包：** 完整 svgPath 数据约 4.5MB，超过主包 2MB 限制。`strokeCache/` 随云函数部署，**不占主包**。
+
+### 云函数新 action：`getStrokeData`
+
+**位置：** `cloudfunctions/main/index.js` switch 末尾
+
+**作用：** 返回单字笔顺数据（points + direction + svgPath）
+
+**调用方式：**
+```js
+// 单字查
+wx.cloud.callFunction({
+  name: 'main',
+  data: { action: 'getStrokeData', data: { char: '住' } }
+})
+// → { success: true, data: { char: '住', strokes: [...] } }
+
+// 批量查（用 | 分隔）
+wx.cloud.callFunction({
+  name: 'main',
+  data: { action: 'getStrokeData', data: { char: '住|任|主' } }
+})
+// → { success: true, hit: 3, miss: 0, data: { '住': {...}, '任': {...}, '主': {...} } }
+```
+
+**注意：** 汉字文件名直接用汉字（如 `住.json`），**不要**用 `encodeURIComponent`（微信云函数 fs 对汉字文件名 UTF-8 支持 OK）。
+
+### 数据生成脚本升级：`scripts/convert-stroke-data.js`
+
+新增 CLI 模式：
+
+```bash
+# 默认 JS 模式（输出 utils/stroke-data.js,无 svgPath,1.6MB 主包用）
+node scripts/convert-stroke-data.js
+
+# JSON 模式（输出 2256 个 JSON 到 cloudfunctions/main/strokeCache/,带 svgPath,云函数本地用）
+node scripts/convert-stroke-data.js --mode=json
+```
+
+**模式差异：**
+| 模式 | 输出 | svgPath | 用途 |
+|------|------|---------|------|
+| JS（默认） | `utils/stroke-data.js` | 不输出 | 主包数据 |
+| JSON | `cloudfunctions/main/strokeCache/*.json` | 输出（toFixed 1 + Q/C/T 简化） | 云函数本地数据 |
+
 ## 已完成功能
 
 - [x] 云函数部署（login, main）
@@ -221,6 +285,10 @@ this.setData(Object.assign({
 - [x] **V2.3**：云函数新增 resetUserData action（清空当前用户学习数据）
 - [x] **V2.3**：settings 页加 "清除学习数据" 按钮（带二次确认）
 - [x] **V2.3 架构优化**：pages/learn/learn.js 抽出 resetLearnStateMachine 公共方法，loadChar / checkMasteredChar 共用
+- [x] **V2.4 阶段 1**：描红底字字体改系统楷体（Kaiti / STKaiti / 楷体 fallback）+ 字号保留 V2.3 修复值 140px
+- [x] **V2.4 阶段 2 Day 1**：笔顺数据拆分到云函数 `cloudfunctions/main/strokeCache/<字>.json`（2256 个，4.5MB 总），加 `getStrokeData` 云函数 action（支持单字 + 批量）
+- [x] **V2.4 阶段 2 Day 2**：`pages/learn/learn.js` 加 `loadStrokeData` + `preloadStrokeData` 异步函数，`initStep3` 改造：先同步 medians 显示无白屏 + 异步拉 svgPath 升级 + 失败 fallback 同步数据
+- [x] **V2.4 调研**：`描红功能调研_横纵分析报告.md`（根目录），调研主流产品（洪恩 / 有道 / 河小象 / 麦田 等）+ Hanzi Writer / Make Me a Hanzi 开源方案，输出 3 个技术选型方案
 
 ## 已修复Bug
 
@@ -289,6 +357,7 @@ this.setData(Object.assign({
 7. **跨比对一致性**：首页统计和列表页统计使用相同的 `learning_progress` 查询条件（V2.3 起统一源）
 8. **切字必重置**：learn / review 等页面切字时**必须**调 `resetLearnStateMachine()`（或在 review 的 `showCurrentQuestion` 写完整重置 setData），避免上一个字的状态残留
 9. **密钥不进代码**：微信 AppSecret、百度 API Key/Secret 等敏感配置**必须**用云函数环境变量（`process.env`），代码里 `if (!xxx) throw new Error` 兜底，缺变量直接 fail 不静默
+10. **主包 2MB 红线**：微信小程序主包硬限制 2MB。新增目录/批量文件前，必须判断这东西是不是该进主包——云函数代码、脚本、文档、node_modules 都不进——如果确定不进，立刻同步更新 `project.config.json` 的 `packOptions.ignore`。写完代码后跑一次「上传」看预估包大小，不要等提测才发现超限。当前排除清单见 `project.config.json` 的 `packOptions.ignore`
 
 ## 部署步骤
 

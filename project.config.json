@@ -32,12 +32,44 @@
         "type": "folder"
       },
       {
+        "value": "cloudfunctions",
+        "type": "folder"
+      },
+      {
         "value": "out",
         "type": "folder"
       },
       {
         "value": "shizi-docs",
         "type": "folder"
+      },
+      {
+        "value": "utils/stroke-data.js",
+        "type": "file"
+      },
+      {
+        "value": "scripts",
+        "type": "folder"
+      },
+      {
+        "value": "docs",
+        "type": "folder"
+      },
+      {
+        "value": "deliverables",
+        "type": "folder"
+      },
+      {
+        "value": "描红功能调研_横纵分析报告.*",
+        "type": "regex"
+      },
+      {
+        "value": ".env.local",
+        "type": "file"
+      },
+      {
+        "value": ".env.local.example",
+        "type": "file"
       }
     ],
     "include": []
