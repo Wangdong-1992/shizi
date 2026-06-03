@@ -1,12 +1,11 @@
 {
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "@cloudbase/database": "^1.4.3",
+    "canvas": "^3.2.3",
     "cnchar": "^3.2.6",
     "cnchar-order": "^3.2.6",
+    "hanzi-writer-data": "^2.0.1",
     "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "canvas": "^3.2.3",
-    "hanzi-writer-data": "^2.0.1"
   }
 }

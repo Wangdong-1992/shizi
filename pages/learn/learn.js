@@ -2,10 +2,12 @@
 // Step1 释义 → Step2 再认 → Step3 描红 → Step4 跟读
 var app = getApp();
 var Delight = require('../../utils/delight.js');
-var StrokeData = require('../../utils/stroke-data.js');
 var ProgHint = require('../../utils/progressive-hint.js');
 var ErrClassifier = require('../../utils/error-classifier.js');
 var TTS = require('../../utils/audio.js');
+// V2.4 阶段 2 修复:不 require utils/stroke-data.js(1.6MB 会进主包,超 2MB 限制)
+// 改用异步 loadStrokeData 从云函数 strokeCache 拉数据
+var StrokeData = null;
 
 // 录音管理器
 var recorderManager = null;
@@ -663,50 +665,134 @@ Page({
   // ==================== Step3: 描红 ====================
 
   /**
+   * V2.4 阶段 2:异步加载笔顺数据(查缓存 → 调云函数 → 写缓存)
+   * @param {string} char - 汉字
+   * @returns {Promise<{char, strokes}>}
+   */
+  loadStrokeData: function(char) {
+    var self = this;
+    return new Promise(function(resolve, reject) {
+      if (!char) {
+        reject(new Error('char 不能为空'));
+        return;
+      }
+      // 1. 查本地缓存
+      var cacheKey = 'stroke_' + char;
+      try {
+        var cached = wx.getStorageSync(cacheKey);
+        if (cached && cached.strokes && cached.strokes[0] && cached.strokes[0].svgPath) {
+          // 缓存命中且含 svgPath
+          resolve(cached);
+          return;
+        }
+      } catch (e) {
+        console.warn('本地缓存读取失败:', char, e.message);
+      }
+      // 2. 调云函数拉数据
+      wx.cloud.callFunction({
+        name: 'main',
+        data: {
+          action: 'getStrokeData',
+          data: { char: char }
+        },
+        success: function(res) {
+          if (res.result && res.result.success && res.result.data) {
+            var strokeData = res.result.data;
+            // 3. 写缓存
+            try {
+              wx.setStorageSync(cacheKey, strokeData);
+            } catch (e) {
+              console.warn('本地缓存写入失败:', char, e.message);
+            }
+            resolve(strokeData);
+          } else {
+            reject(new Error((res.result && res.result.error) || '云函数返回错误'));
+          }
+        },
+        fail: function(err) {
+          reject(new Error((err && (err.errMsg || err.message)) || '网络请求失败'));
+        }
+      });
+    });
+  },
+
+  /**
+   * V2.4 阶段 2:预加载后续字的笔顺数据(背景,失败忽略)
+   * @param {string[]} chars - 汉字数组
+   */
+  preloadStrokeData: function(chars) {
+    var self = this;
+    if (!Array.isArray(chars) || chars.length === 0) return;
+    for (var i = 0; i < chars.length; i++) {
+      (function(char) {
+        // 错开 100ms 启动,避免阻塞主流程
+        setTimeout(function() {
+          self.loadStrokeData(char).then(function() {
+            console.log('预加载成功:', char);
+          }).catch(function(err) {
+            console.warn('预加载失败:', char, err && err.message);
+          });
+        }, 100 * (i + 1));
+      })(chars[i]);
+    }
+  },
+
+  /**
    * 初始化 Step3
-   * 加载笔顺数据，初始化 Canvas，绘制引导线
+   * V2.4 阶段 2 修复:完全不 require utils/stroke-data.js(1.6MB 进主包,超 2MB 限制)
+   * 改用完全异步 loadStrokeData 从云函数 strokeCache 拉数据
+   * 体验: 进 Step3 有 200-500ms 延迟(loading),拉到底字 + 引导线出现
    */
   initStep3: function() {
     var self = this;
-
-    // 尝试加载笔顺数据
     var currentChar = self.data.currentChar;
-    var strokeInfo = StrokeData.getStrokeData(currentChar);
 
-    if (strokeInfo && strokeInfo.strokes && strokeInfo.strokes.length > 0) {
-      self.setData({
-        strokePaths: strokeInfo.strokes,
-        strokeIndex: 0,
-        strokeCompleted: false,
-        showStrokeGuide: true,
-        hasStrokeData: true,
-        totalStrokes: strokeInfo.strokes.length,
-        strokeDeviation: false
-      });
+    // 先设空状态
+    self.setData({
+      strokePaths: [],
+      strokeIndex: 0,
+      strokeCompleted: false,
+      showStrokeGuide: false,
+      hasStrokeData: false,
+      totalStrokes: 0,
+      strokeDeviation: false
+    });
 
-      // 延迟绘制，等待 canvas 渲染完成
+    // 异步拉 strokeCache(查本地缓存 → 调云函数 strokeCache/<字>.json)
+    self.loadStrokeData(currentChar).then(function(strokeData) {
+      if (strokeData && strokeData.strokes && strokeData.strokes.length > 0) {
+        if (self.data.currentStep !== 3) return;
+        if (self.data.currentChar !== currentChar) return;
+
+        self.setData({
+          strokePaths: strokeData.strokes,
+          strokeIndex: 0,
+          strokeCompleted: false,
+          showStrokeGuide: true,
+          hasStrokeData: true,
+          totalStrokes: strokeData.strokes.length,
+          strokeDeviation: false
+        });
+        // 延迟绘制,等 canvas 渲染完成
+        setTimeout(function() {
+          self.drawStrokeGuide();
+        }, 100);
+      } else {
+        // 云函数没数据
+        self.strokeTimeout = setTimeout(function() {
+          if (!self.data.strokeCompleted && self.data.currentStep === 3) {
+            self.onStep3Skip();
+          }
+        }, 3000);
+      }
+    }).catch(function(err) {
+      // 网络断开/云函数失败
+      console.error('loadStrokeData 失败,跳过描红:', currentChar, err && err.message);
+      self.setData({ tipMessage: '网络异常,3秒后跳过描红' });
       setTimeout(function() {
-        self.drawStrokeGuide();
-      }, 400);
-    } else {
-      // 无笔顺数据
-      self.setData({
-        strokePaths: [],
-        strokeIndex: 0,
-        strokeCompleted: false,
-        showStrokeGuide: false,
-        hasStrokeData: false,
-        totalStrokes: 0,
-        strokeDeviation: false
-      });
-
-      // 3秒后自动跳过
-      self.strokeTimeout = setTimeout(function() {
-        if (!self.data.strokeCompleted && self.data.currentStep === 3) {
-          self.onStep3Skip();
-        }
+        if (self.data.currentStep === 3) self.onStep3Skip();
       }, 3000);
-    }
+    });
   },
 
   /**
@@ -737,19 +823,53 @@ Page({
       // 清空画布
       ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-      // 绘制汉字底图（半透明）—— 字号预留 15% 边距,避免贴边
-      ctx.font = '140px sans-serif';
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(self.data.currentChar, canvasWidth / 2, canvasHeight / 2);
-
       // 缩放因子：笔顺数据基于200x200，canvas实际尺寸可能不同
       var scaleX = canvasWidth / 200;
       var scaleY = canvasHeight / 200;
 
       var strokePaths = self.data.strokePaths;
       var strokeIndex = self.data.strokeIndex;
+
+      // V2.4 优化:用 SVG path 渲染底字(替代原版 sans-serif 字体)
+      // 解决"系统字体 vs Arphic 楷体"不贴合的视觉割裂问题
+      // 底字和虚线引导来自同源数据(都是 Make Me a Hanzi),100% 贴合
+      if (strokePaths && strokePaths.length > 0 && strokePaths[0].svgPath) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+        ctx.scale(scaleX, scaleY);
+        for (var pi = 0; pi < strokePaths.length; pi++) {
+          if (strokePaths[pi] && strokePaths[pi].svgPath) {
+            try {
+              var p = new Path2D(strokePaths[pi].svgPath);
+              ctx.fill(p, 'evenodd');
+            } catch (e) {
+              // 兼容老数据:无 svgPath 时降级到系统楷体
+              if (pi === 0) {
+                ctx.restore();
+                // V2.4 阶段 1(暂时回退):改字体到 sans-serif —— 描红字体贴合问题等整体重构解决
+                // 原版:Kaiti/STKaiti/楷体,但 Kaiti leading 留白 + 字号 140 在 200x200 画布里过大
+                // → 字号撑满画布 + 0.06 alpha 颜色太淡,字形几乎看不见
+                // TODO:整体重构时用 SVG path 渲染(100% 贴合,无字体对齐问题)
+                ctx.font = '140px sans-serif';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(self.data.currentChar, canvasWidth / 2, canvasHeight / 2);
+                ctx.save();
+              }
+            }
+          }
+        }
+        ctx.restore();
+      } else {
+        // 数据无 svgPath 时的降级方案(暂时回退到 V2.3 sans-serif,等整体重构)
+        // TODO:整体重构时用 SVG path 渲染
+        ctx.font = '140px sans-serif';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(self.data.currentChar, canvasWidth / 2, canvasHeight / 2);
+      }
 
       // 绘制已完成笔画（灰色实线）
       for (var i = 0; i < strokeIndex && i < strokePaths.length; i++) {
