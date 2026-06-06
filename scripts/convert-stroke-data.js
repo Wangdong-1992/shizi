@@ -573,6 +573,9 @@ function simplifyPoints(median, norm) {
   var result = [];
   for (var i = 0; i < simplified.length; i++) {
     var np = normalizePoint(simplified[i][0], simplified[i][1], norm);
+    // V2.4 修复: y 翻转补偿 WeChat canvas 镜像 — 与 normalizeSvgPath 保持一致
+    // 源数据 (hanzi-writer-data) 用 y-up (y=0 在底),需翻成 y-down 才能和 svgPath 同坐标系
+    np.y = 200 - np.y;
     result.push(np);
   }
 
