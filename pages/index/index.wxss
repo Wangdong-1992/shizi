@@ -4,7 +4,7 @@ page {
 }
 
 .container {
-  padding: 32rpx;
+  padding: 24rpx 32rpx;
   padding-bottom: 140rpx;
 }
 
@@ -19,45 +19,95 @@ page {
 
 /* ====== 顶部区域 ====== */
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 32rpx;
+  margin: 0 0 24rpx;
 }
 
 .user-info {
+  background: white;
+  border-radius: 32rpx;
+  padding: 24rpx;
   display: flex;
   align-items: center;
-  gap: 24rpx;
+  gap: 20rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
 }
 
-.avatar {
-  width: 112rpx;
-  height: 112rpx;
+.user-avatar {
+  width: 96rpx;
+  height: 96rpx;
   border-radius: 50%;
   background: linear-gradient(135deg, #FFD93D 0%, #FF9F43 100%);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 60rpx;
-  box-shadow: 0 8rpx 24rpx rgba(255, 159, 67, 0.4);
-  border: 6rpx solid white;
+  flex-shrink: 0;
+  box-shadow: 0 4rpx 12rpx rgba(255, 159, 67, 0.35);
+  border: 4rpx solid #FFF8E7;
 }
 
-.user-text {
+.avatar-icon {
+  font-size: 48rpx;
+  line-height: 1;
+}
+
+.avatar-level {
+  font-size: 16rpx;
+  color: white;
+  font-weight: 600;
+  margin-top: 2rpx;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+  line-height: 1;
+}
+
+.user-meta {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 6rpx;
+  min-width: 0;
 }
 
 .greeting {
-  font-size: 28rpx;
-  color: #666;
+  font-size: 24rpx;
+  color: #999;
+  line-height: 1.2;
 }
 
 .nickname {
-  font-size: 40rpx;
+  font-size: 36rpx;
   font-weight: bold;
   color: #333;
+  line-height: 1.2;
+}
+
+.growth-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 4rpx;
+}
+
+.growth-bar {
+  flex: 1;
+  height: 8rpx;
+  background: #E8ECF0;
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+
+.growth-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4A90D9, #7AB3ED);
+  border-radius: 4rpx;
+  transition: width 0.8s ease;
+}
+
+.growth-bar-text {
+  font-size: 20rpx;
+  color: #999;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ====== 统计卡片 ====== */
@@ -67,7 +117,7 @@ page {
   padding: 32rpx;
   display: flex;
   justify-content: space-around;
-  margin-bottom: 32rpx;
+  margin-bottom: 24rpx;
   box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
 }
 
@@ -118,10 +168,6 @@ page {
 }
 
 /* ====== V2.2 今日待复习卡片 ====== */
-.review-card {
-  margin-bottom: 24rpx;
-}
-
 .review-card-anim {
   animation-delay: 0.28s;
 }
@@ -177,7 +223,7 @@ page {
 }
 
 /* ====== R-15: 分享成就卡片 ====== */
-.share-card-area {
+.review-card {
   margin-bottom: 24rpx;
 }
 
@@ -216,12 +262,20 @@ page {
 }
 
 /* ====== 操作区域 ====== */
-.actions {
-  margin-bottom: 32rpx;
+.progress-section {
+  margin: 0 8rpx 24rpx;
+  background: white;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
 }
 
 .actions-anim {
   animation-delay: 0.4s;
+}
+
+.actions {
+  margin-bottom: 24rpx;
 }
 
 .section-title {
@@ -636,56 +690,9 @@ page {
   50%      { transform: scale(1.05); }
 }
 
-/* ====== R-14: 成长等级 ====== */
-.growth-avatar-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-right: 24rpx;
-}
-
-.growth-icon {
-  font-size: 64rpx;
-}
-
-.growth-label {
-  font-size: 22rpx;
-  color: #999;
-  margin-top: 4rpx;
-}
-
-.growth-bar-wrap {
-  margin-top: 12rpx;
-  width: 100%;
-}
-
-.growth-bar {
-  height: 8rpx;
-  background: #E8ECF0;
-  border-radius: 4rpx;
-  overflow: hidden;
-}
-
-.growth-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #4A90D9, #7AB3ED);
-  border-radius: 4rpx;
-  transition: width 0.8s ease;
-}
-
-.growth-bar-text {
-  font-size: 20rpx;
-  color: #999;
-  margin-top: 4rpx;
-}
-
 /* ====== R-14: 每日进度 + 个人最佳 ====== */
-.progress-section {
-  margin: 0 8rpx 20rpx;
-  background: white;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
+.share-card-area {
+  margin-bottom: 24rpx;
 }
 
 .section-row {

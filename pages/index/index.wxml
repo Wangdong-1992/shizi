@@ -2,21 +2,21 @@
   <!-- 已登录状态 -->
   <block wx:if="{{isLoggedIn}}">
     <!-- R-14: 顶部区域 — 成长等级 + 个人信息 -->
-    <view class="header entrance-item" wx:if="{{entranceReady}}">
+    <view class="header entrance-item{{entranceReady ? ' entrance-slide-up' : ''}}" wx:if="{{entranceReady}}">
       <view class="user-info">
-        <view class="growth-avatar-area">
-          <text class="growth-icon">{{growthLevel.icon}}</text>
-          <text class="growth-label">{{growthLevel.label}}</text>
+        <view class="user-avatar">
+          <text class="avatar-icon">{{growthLevel.icon}}</text>
+          <text class="avatar-level">{{growthLevel.label}}</text>
         </view>
-        <view class="user-text">
+        <view class="user-meta">
           <text class="greeting">{{greetingText}}</text>
           <text class="nickname">{{userInfo.nickname || '小朋友'}}</text>
-          <view class="growth-bar-wrap">
+          <view class="growth-row">
             <view class="growth-bar">
               <view class="growth-bar-fill" style="width: {{growthLevel.progress}}%"></view>
             </view>
-            <text class="growth-bar-text" wx:if="{{growthLevel.next}}">距{{growthLevel.next}}字升级</text>
-            <text class="growth-bar-text" wx:else>已达最高等级</text>
+            <text class="growth-bar-text" wx:if="{{growthLevel.next}}">距{{growthLevel.next}}字</text>
+            <text class="growth-bar-text" wx:else>已达满级 ✨</text>
           </view>
         </view>
       </view>
