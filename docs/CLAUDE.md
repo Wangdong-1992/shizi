@@ -73,7 +73,10 @@ E:/claude/PMRD/shizi/
   "mastered_chars": [],
   "last_learn_date": "",
   "token": "xxx",
-  "token_expire": "Date"
+  "token_expire": "Date",
+  "age": null,                    // V2.4 宝宝年龄(3-6,null 表示未设置,前端 fallback 5 岁)
+  "push_subscribed": false,       // R-15 复习提醒订阅
+  "max_combo": 0                  // R-14 个人最佳连击
 }
 ```
 
@@ -225,6 +228,41 @@ this.setData(Object.assign({
 
 **为什么拆 JSON 不放主包：** 完整 svgPath 数据约 4.5MB，超过主包 2MB 限制。`strokeCache/` 随云函数部署，**不占主包**。
 
+### 描红评分升级：DTW + 按年龄容差（V2.4 阶段 2 Day 4）
+
+**问题**：原版描红评分是"点到折线最短距离 + 固定阈值 30/35 像素"（`calcDeviation` + `calcAverageDeviation`）。3-4 岁手部精细动作弱，沿用 5-6 岁阈值会觉得"字难写,怎么写都不对",挫败感强;且点距离无法识别"反向画"和"画错形状"。
+
+**方案**：
+- 新模块 `utils/stroke-dtw.js`：标准 DTW (Dynamic Time Warping) + 预降采样 24 点（等弧长采样，576 步 DP，< 1ms）
+- 4 档年龄容差表（3 岁最宽松、6 岁最严、5 岁为默认档）
+- `users` 集合加 `age` 字段（3-6 整数，null 表示未设置）
+- 设置页加"宝宝年龄"行（picker mode="selector"），调用 `updateUserInfo` 持久化
+- learn.js 在 touchstart 缓存容差到 `self._tolerance`，touchend 用 DTW 评分替换固定阈值
+
+**算法核心**：
+| 函数 | 作用 |
+|------|------|
+| `resamplePath(points, n=24)` | 等弧长降采样到 n 个点 |
+| `euclideanDist(a, b)` | 欧氏距离 |
+| `calcDTWDistance(a, b)` | DP 表标准 DTW，归一化返回平均距离（DP/(N+M)） |
+| `scoreStroke(userPts, guidePts)` | resample + DTW + 线性映射 [0, 30] → [1, 0] |
+| `getAgeTolerance(age)` | 查 4 档表，age 不在 3-6 回退到 5 岁档 |
+
+**容差表**（按实测 DTW 距离分布校准）：
+
+| 年龄 | warn 像素 | pass 像素 | DTW 分数阈值 | 行为 |
+|------|----------|----------|------------|------|
+| 3 岁 | 50 | 45 | 0.45 | 最宽松 |
+| 4 岁 | 45 | 40 | 0.55 | 较宽松 |
+| 5 岁 | 35 | 30 | 0.70 | 默认档 |
+| 6 岁 | 30 | 25 | 0.85 | 最严 |
+
+**性能**：`1000 次 scoreStroke < 10ms`（脚本 `scripts/test-stroke-dtw.js` 测得）。touchend 1 帧（< 16ms）内完成,不卡顿。
+
+**单元测试**：`node scripts/test-stroke-dtw.js` 跑 28 项测试（覆盖算法、性能、边界值）。
+
+**默认值**：新用户 `age: null`,前端 fallback 5 岁档(不打断首次使用);老用户无 age 字段同理 fallback。
+
 ### 云函数新 action：`getStrokeData`
 
 **位置：** `cloudfunctions/main/index.js` switch 末尾
@@ -316,6 +354,7 @@ node scripts/convert-stroke-data.js --mode=json
 - [x] **V2.4 阶段 2 Day 1**：笔顺数据拆分到云函数 `cloudfunctions/main/strokeCache/<字>.json`（2256 个，4.5MB 总），加 `getStrokeData` 云函数 action（支持单字 + 批量）
 - [x] **V2.4 阶段 2 Day 2**：`pages/learn/learn.js` 加 `loadStrokeData` + `preloadStrokeData` 异步函数，`initStep3` 改造：先同步 medians 显示无白屏 + 异步拉 svgPath 升级 + 失败 fallback 同步数据
 - [x] **V2.4 阶段 2 Day 3**：Canvas 坐标系修复（固定 200×200 逻辑坐标，解耦 rpx→px 设备差异）+ SVG path 坐标翻转补偿 + 逐字归一化含 SVG 轮廓包围盒 + 笔顺纠正增强（7类方向 + reorderToGB 贪心匹配 + 1293字纠正）
+- [x] **V2.4 阶段 2 Day 4**：描红评分升级 DTW + 按年龄容差（`utils/stroke-dtw.js` + `users.age` 字段 + 设置页 picker + learn.js 接入；脚本 `scripts/test-stroke-dtw.js` 28 项测试全过）
 - [x] **V2.4 调研**：`描红功能调研_横纵分析报告.md`（根目录），调研主流产品（洪恩 / 有道 / 河小象 / 麦田 等）+ Hanzi Writer / Make Me a Hanzi 开源方案，输出 3 个技术选型方案
 
 ## 已修复Bug

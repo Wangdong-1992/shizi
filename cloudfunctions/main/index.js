@@ -567,6 +567,7 @@ exports.main = async (event, context) => {
               streak_count: 0,
               mastered_chars: [],
               last_learn_date: '',
+              age: null,            // V2.4 宝宝年龄(3-6,null 表示未设置)
               created_at: new Date(),
               updated_at: new Date()
             }
@@ -1638,7 +1639,7 @@ exports.main = async (event, context) => {
 
       case 'updateUserInfo': {
         // 更新用户昵称和头像（登录授权后调用）
-        const { openid, nickname, avatar_url, avatarUrl } = data;
+        const { openid, nickname, avatar_url, avatarUrl, age } = data;
         if (!openid) {
           return { success: false, error: 'openid不能为空' };
         }
@@ -1647,9 +1648,13 @@ exports.main = async (event, context) => {
         const updateData = { updated_at: new Date() };
         if (nickname) updateData.nickname = nickname;
         if (finalAvatar) updateData.avatar_url = finalAvatar;
+        // V2.4 宝宝年龄:仅接受 3-6 整数,其他值忽略(防止前端 bug 写入垃圾)
+        if (age === 3 || age === 4 || age === 5 || age === 6) {
+          updateData.age = age;
+        }
 
         await db.collection('users').where({ openid }).update({ data: updateData });
-        console.log('updateUserInfo success, openid:', openid, 'nickname:', nickname);
+        console.log('updateUserInfo success, openid:', openid, 'nickname:', nickname, 'age:', age);
         return { success: true };
       }
 

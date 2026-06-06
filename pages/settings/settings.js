@@ -5,6 +5,7 @@ Page({
   data: {
     currentNickname: '',
     currentAvatar: '',
+    currentAge: null,    // V2.4 宝宝年龄(3-6,null 表示未设置)
 
     // R-15: 推送订阅
     pushSubscribed: false,
@@ -23,7 +24,14 @@ Page({
     avatarPopup: {
       show: false,
       tempUrl: ''
-    }
+    },
+
+    // V2.4 宝宝年龄弹窗
+    agePopup: {
+      show: false,
+      index: 2   // 默认 5 岁(ageRange 第 3 项)
+    },
+    ageRange: ['3岁', '4岁', '5岁', '6岁']
   },
 
   onShow() {
@@ -41,8 +49,11 @@ Page({
       this.setData({
         currentNickname: user.nickname || '小朋友',
         currentAvatar: user.avatar_url || '',
-        pushSubscribed: user.push_subscribed || false
+        pushSubscribed: user.push_subscribed || false,
+        currentAge: typeof user.age === 'number' ? user.age : null
       });
+      // 同步到 app.globalData,供 learn.js 描红容差读取
+      app.globalData.userAge = typeof user.age === 'number' ? user.age : null;
     } catch (err) {
       console.error('加载用户信息失败:', err);
     }
@@ -208,6 +219,79 @@ Page({
     }
   },
 
+  // ==================== V2.4 宝宝年龄 ====================
+
+  /**
+   * 打开年龄选择弹窗
+   * 从 currentAge 算出 ageRange 索引作为 picker 初始值
+   */
+  showAgeSheet: function() {
+    var self = this;
+    var currentAge = self.data.currentAge;
+    // 默认 5 岁(index=2);已设置过则定位到对应索引
+    var index = 2;
+    if (currentAge === 3) index = 0;
+    else if (currentAge === 4) index = 1;
+    else if (currentAge === 5) index = 2;
+    else if (currentAge === 6) index = 3;
+    self.setData({
+      'agePopup.show': true,
+      'agePopup.index': index
+    });
+  },
+
+  closeAgePopup: function() {
+    this.setData({ 'agePopup.show': false });
+  },
+
+  /**
+   * picker 滚动回调
+   */
+  onAgePickerChange: function(e) {
+    this.setData({ 'agePopup.index': e.detail.value });
+  },
+
+  /**
+   * 确认年龄 → 调云函数 → 同步 app.globalData
+   */
+  confirmAge: function() {
+    var self = this;
+    var index = self.data.agePopup.index;
+    // 从 '3岁' / '4岁' / '5岁' / '6岁' 提取数字
+    var ageStr = self.data.ageRange[index] || '5岁';
+    var age = parseInt(ageStr, 10);
+    if (age !== 3 && age !== 4 && age !== 5 && age !== 6) {
+      wx.showToast({ title: '无效年龄', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '保存中...' });
+    var openid = null;
+    app.getOpenid().then(function(oid) {
+      openid = oid;
+      return wx.cloud.callFunction({
+        name: 'main',
+        data: {
+          action: 'updateUserInfo',
+          data: { openid: openid, age: age }
+        }
+      });
+    }).then(function() {
+      // 成功:更新本地 + 同步到 app 全局
+      self.setData({
+        currentAge: age,
+        'agePopup.show': false
+      });
+      app.globalData.userAge = age;
+      wx.hideLoading();
+      wx.showToast({ title: '已设为' + age + '岁', icon: 'success' });
+    }).catch(function(err) {
+      wx.hideLoading();
+      console.error('年龄保存失败:', err);
+      wx.showToast({ title: '保存失败,请重试', icon: 'none' });
+    });
+  },
+
   // ==================== R-15: 推送订阅 ====================
 
   togglePushReminder: async function(e) {
@@ -324,6 +408,7 @@ Page({
           app.globalData.openid = null;
           app.globalData.userInfo = null;
           app.globalData.fromMasteredChar = null;
+          app.globalData.userAge = null;
 
           wx.hideLoading();
           wx.showToast({ title: '已清除,请重新登录', icon: 'success', duration: 2000 });
@@ -359,6 +444,7 @@ Page({
           app.globalData.openid = null;
           app.globalData.userInfo = null;
           app.globalData.fromMasteredChar = null;
+          app.globalData.userAge = null;
           wx.switchTab({ url: '/pages/index/index' });
         }
       }

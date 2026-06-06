@@ -5,6 +5,8 @@ var Delight = require('../../utils/delight.js');
 var ProgHint = require('../../utils/progressive-hint.js');
 var ErrClassifier = require('../../utils/error-classifier.js');
 var TTS = require('../../utils/audio.js');
+// V2.4 DTW 描红评分 + 按年龄容差
+var StrokeDTW = require('../../utils/stroke-dtw.js');
 // V2.4 阶段 2 修复:绝对不引用笔顺数据同步文件(1.5MB 会进主包,超 1.5MB 限制)
 // 改用完全异步 loadStrokeData 从云函数 strokeCache 拉数据
 var StrokeData = null;
@@ -40,6 +42,7 @@ Page({
     hasStrokeData: false,      // 是否有笔顺数据
     totalStrokes: 0,           // 总笔画数
     strokeDeviation: false,    // 是否偏离引导线
+    lastStrokeScore: null,     // V2.4 DTW 描红最后一笔得分(0-1)
 
     // Step4 跟读（复用V2.1逻辑）
     isRecording: false,
@@ -954,6 +957,13 @@ Page({
     self._userPoints = [{ x: x, y: y }];
     self._lastDeviation = 0;
 
+    // V2.4 按用户年龄取容差阈值,缓存到 self 避免 touchmove 每帧查表
+    // (60fps 调用极频繁,查表开销不必要)
+    var userAge = (app.globalData && app.globalData.userAge) || 5;
+    self._tolerance = StrokeDTW.getAgeTolerance(userAge);
+    self._warnThreshold = self._tolerance.warn;
+    self._passScore = self._tolerance.score;
+
     // 绘制起始点
     if (self._canvasCtx) {
       var ctx = self._canvasCtx;
@@ -1002,8 +1012,8 @@ Page({
     var deviation = self.calcDeviation(x, y);
     self._lastDeviation = deviation;
 
-    if (deviation > 35) {
-      // 偏离过远 → 振动提示 + 引导线变红
+    if (deviation > self._warnThreshold) {
+      // 偏离过远 → 振动提示 + 引导线变红(V2.4 阈值按年龄)
       if (!self.data.strokeDeviation) {
         self.setData({ strokeDeviation: true });
         try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
@@ -1022,7 +1032,7 @@ Page({
 
   /**
    * Canvas 触摸结束
-   * 判定该笔画是否跟随成功
+   * V2.4:用 DTW 评分替换固定 avgDeviation < 30 阈值,按年龄分档
    */
   onStrokeTouchEnd: function(e) {
     var self = this;
@@ -1032,11 +1042,17 @@ Page({
     if (self.data.strokeCompleted) return;
     if (!self.data.hasStrokeData) return;
 
-    // 计算用户轨迹与引导线的平均偏移距离
-    var avgDeviation = self.calcAverageDeviation();
+    // DTW 评分:用户轨迹 vs 当前引导路径 → 0-1 分数
+    var currentStroke = self.data.strokePaths[self.data.strokeIndex];
+    var guidePts = (currentStroke && currentStroke.points) || [];
+    var score = StrokeDTW.scoreStroke(self._userPoints, guidePts);
 
-    if (avgDeviation < 30) {
+    // 容差阈值在 touchstart 已缓存(按年龄分档)
+    var passScore = self._passScore || 0.70;
+
+    if (score >= passScore) {
       // 跟随成功 → 完成当前笔画
+      self.setData({ lastStrokeScore: score });
       self.completeCurrentStroke();
     } else {
       // 跟随不够好 → 提示重试，不推进
