@@ -1,4 +1,4 @@
-// 学习页面 — V2.2 四步递进状态机
+﻿// 学习页面 — V2.2 四步递进状态机
 // Step1 释义 → Step2 再认 → Step3 描红 → Step4 跟读
 var app = getApp();
 var Delight = require('../../utils/delight.js');
