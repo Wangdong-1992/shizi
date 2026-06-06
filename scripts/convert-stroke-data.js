@@ -30,14 +30,76 @@ var CLOUD_STROKE_CACHE_DIR = path.join(__dirname, '..', 'cloudfunctions', 'main'
 // V2.4 模式:js(主包数据,无 svgPath) | json(云函数缓存,带 svgPath)
 var MODE = (process.argv[2] === '--mode=json') ? 'json' : 'js';
 
-var SCALE = 200 / 1024;
+var SCALE = 200 / 1024;  // 保留旧常量供 fixStrokeOrder 边界框计算参考
+var MARGIN = 10;         // 四周边距
+
+/**
+ * V2.4 逐字坐标归一化:计算每个字的包围盒,居中缩放到 200×200(留 MARGIN 边距)
+ * @param {number[][]} medians - 原始 1024 空间笔画中线
+ * @returns {{ scale: number, offsetX: number, offsetY: number }}
+ */
+function computeCharNormalize(medians, rawStrokes) {
+  var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+  // 1. median 中线包围盒
+  for (var i = 0; i < medians.length; i++) {
+    for (var j = 0; j < medians[i].length; j++) {
+      var px = medians[i][j][0], py = medians[i][j][1];
+      if (px < minX) minX = px;
+      if (px > maxX) maxX = px;
+      if (py < minY) minY = py;
+      if (py > maxY) maxY = py;
+    }
+  }
+
+  // 2. SVG 路径轮廓包围盒(轮廓天然比中线宽,需纳入计算以避免边距裁剪)
+  if (rawStrokes) {
+    for (var s = 0; s < rawStrokes.length; s++) {
+      var path = rawStrokes[s];
+      if (typeof path !== 'string') continue;
+      var coords = path.match(/-?\d+\.?\d*(?:[eE][+-]?\d+)?/g);
+      if (!coords) continue;
+      for (var c = 0; c + 1 < coords.length; c += 2) {
+        var sx = parseFloat(coords[c]), sy = parseFloat(coords[c + 1]);
+        if (isNaN(sx) || isNaN(sy)) continue;
+        if (sx < minX) minX = sx;
+        if (sx > maxX) maxX = sx;
+        if (sy < minY) minY = sy;
+        if (sy > maxY) maxY = sy;
+      }
+    }
+  }
+
+  var rangeX = maxX - minX || 1;
+  var rangeY = maxY - minY || 1;
+  var contentSize = 200 - 2 * MARGIN; // 180
+  var scale = contentSize / Math.max(rangeX, rangeY);
+  // 居中偏移:使包围盒中心映射到 100,100
+  var centerX = (minX + maxX) / 2;
+  var centerY = (minY + maxY) / 2;
+  var offsetX = 100 - centerX * scale;
+  var offsetY = 100 - centerY * scale;
+  return { scale: scale, offsetX: offsetX, offsetY: offsetY };
+}
+
+/**
+ * 应用逐字归一化到单个坐标点
+ */
+function normalizePoint(x, y, norm) {
+  return {
+    x: Math.round(x * norm.scale + norm.offsetX),
+    y: Math.round(y * norm.scale + norm.offsetY)
+  };
+}
 
 // ---- cnchar direction-type 兼容表 ----
+// V2.4 扩展: 'u' 拆分为 'u'(捺) + 'p'(点),提升匹配精度
 var DIR_COMPAT = {
   'h': ['横', '提'],
   'v': ['竖', '竖钩', '弯钩', '斜钩', '卧钩'],
   'd': ['撇', '撇折', '撇点'],
-  'u': ['捺', '点', '点2', '提'],
+  'u': ['捺'],
+  'p': ['点', '点2'],
   't': ['横折', '竖折', '撇折', '横折钩', '竖折折钩', '横折提',
         '横撇', '横钩', '横斜钩', '竖弯', '竖弯钩', '竖提',
         '竖折撇', '竖折折', '弯钩', '斜钩', '卧钩',
@@ -205,6 +267,139 @@ function fixStrokeOrder(medians, strokes, charName) {
   return result;
 }
 
+/**
+ * V2.4:获取 cnchar 的笔画详情(含 type/foldCount/letter,用于精细匹配)
+ * @returns {Array<{name,type,foldCount,letter}>} | null
+ */
+function getCnCharDetails(char) {
+  try {
+    var result = cnchar.stroke(char, 'order', 'detail');
+    if (result && result[0] && result[0].length > 0) return result[0];
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * V2.4:基于 cnchar GB 标准笔画顺序,用贪心匹配重排 hw 笔画
+ *
+ * 算法:
+ *   1. 获取 cnchar 笔画详情(GB 标准顺序)
+ *   2. 构建兼容性得分矩阵[gbPos][hwPos]:
+ *      - 方向匹配: +100 分
+ *      - 平笔/折笔类型匹配: +50 分
+ *      - foldCount 匹配: +30 分
+ *      - 空间位置匹配(基于 Y 排序): +20 分
+ *   3. 贪心分配: 按 GB 顺序依次挑选最佳未匹配 hw 笔画
+ *   4. 仅当新序得分 > 原序 × 1.2 时才执行重排
+ *
+ * @returns {{ strokes, fixed: boolean, log: string }}
+ */
+function reorderToGB(medians, strokes, charName) {
+  var result = { strokes: strokes, fixed: false, log: '' };
+
+  var cnDetails = getCnCharDetails(charName);
+  if (!cnDetails || cnDetails.length !== strokes.length) return result;
+  if (strokes.length < 2) return result;
+
+  var n = strokes.length;
+  var bounds = medians.map(function(m) { return getStrokeBounds(m); });
+
+  // 计算每个 hw 笔画的空间排名(按 centerY 升序 = 从上到下)
+  var yRanked = bounds.map(function(b, i) { return { idx: i, cy: b.centerY, cx: b.centerX }; });
+  yRanked.sort(function(a, b) {
+    // 同一水平线(±50px 内)按 X 左到右排
+    if (Math.abs(a.cy - b.cy) < 50) return a.cx - b.cx;
+    return a.cy - b.cy;
+  });
+  var hwRank = [];  // hwRank[hwIdx] = 0~1 空间排名
+  for (var r = 0; r < yRanked.length; r++) {
+    hwRank[yRanked[r].idx] = r / Math.max(n - 1, 1);
+  }
+
+  // 构建得分矩阵
+  var scoreMatrix = [];
+  for (var ci = 0; ci < n; ci++) {
+    scoreMatrix[ci] = [];
+    var cn = cnDetails[ci];
+    var cnName = cnTypeToKey(cn.name);
+    var cnIsTurn = (cn.type === '折笔');
+    var cnFolds = parseInt(cn.foldCount) || 0;
+
+    for (var hi = 0; hi < n; hi++) {
+      var dir = strokes[hi].direction;
+      var score = 0;
+
+      // 方向兼容 (100分)
+      var compatList = DIR_COMPAT[dir];
+      if (compatList && compatList.indexOf(cnName) >= 0) {
+        score += 100;
+      } else if (cnIsTurn && dir === 't') {
+        score += 40;  // 折笔未精确匹配但方向对
+      } else if (!cnIsTurn && dir !== 't') {
+        score += 20;  // 平笔未精确匹配但方向对
+      }
+
+      // 平笔/折笔类型匹配 (50分)
+      var hwIsTurn = (dir === 't');
+      if (hwIsTurn === cnIsTurn) score += 50;
+
+      // foldCount 匹配 (30分,仅折笔)
+      if (cnIsTurn && hwIsTurn) {
+        // hw 折笔估算 foldCount (实际展开需要更复杂的检测,这里保守给半分)
+        score += 15;
+      }
+
+      // 空间位置匹配 (20分)
+      var gbRank = ci / Math.max(n - 1, 1);
+      var posDiff = Math.abs(gbRank - hwRank[hi]);
+      score += Math.round(20 * (1 - posDiff));
+
+      scoreMatrix[ci][hi] = score;
+    }
+  }
+
+  // 贪心分配
+  var assignment = [];
+  var used = [];
+  for (var ci2 = 0; ci2 < n; ci2++) {
+    var bestHi = -1, bestScore = -1;
+    for (var hi2 = 0; hi2 < n; hi2++) {
+      if (used[hi2]) continue;
+      if (scoreMatrix[ci2][hi2] > bestScore) {
+        bestScore = scoreMatrix[ci2][hi2];
+        bestHi = hi2;
+      }
+    }
+    assignment[ci2] = bestHi;
+    used[bestHi] = true;
+  }
+
+  // 计算得分改善
+  var origScore = 0, newScore = 0;
+  for (var ci3 = 0; ci3 < n; ci3++) {
+    origScore += scoreMatrix[ci3][ci3];
+    newScore += scoreMatrix[ci3][assignment[ci3]];
+  }
+
+  // 仅当显著改善(>20%)且与原序不同时执行重排
+  var isDifferent = false;
+  for (var di = 0; di < n; di++) {
+    if (assignment[di] !== di) { isDifferent = true; break; }
+  }
+
+  if (isDifferent && newScore > origScore * 1.1) {
+    var newStrokes = [];
+    for (var ci4 = 0; ci4 < n; ci4++) {
+      newStrokes[ci4] = strokes[assignment[ci4]];
+    }
+    result.strokes = newStrokes;
+    result.fixed = true;
+    result.log = '  [GB-FIX] ' + charName + ': 贪心匹配重排 (score ' + origScore + '→' + newScore + ')';
+  }
+
+  return result;
+}
+
 // 从一级字表读取完整字符列表
 function loadTargetChars() {
   var wb = XLSX.readFile(XLSX_FILE);
@@ -264,17 +459,32 @@ function classifyDirection(points) {
 
   if (hasTurn) return 't';
 
+  // V2.4:计算笔画总行程长度,用于区分 捺(长) vs 点(短)
+  var pathLen = 0;
+  for (var i = 1; i < points.length; i++) {
+    var segDx2 = points[i][0] - points[i - 1][0];
+    var segDy2 = points[i][1] - points[i - 1][1];
+    pathLen += Math.sqrt(segDx2 * segDx2 + segDy2 * segDy2);
+  }
+  var DOT_MAX_LEN = 350;  // 1024 空间中点最长约 340,捺最短约 540
+
   // 根据主方向判断
   var ratio = absDx / Math.max(absDy, 1);
 
   if (ratio > 2.5) return 'h';  // 横: 明显水平
-  if (ratio < 0.4) return 'v';   // 竖: 明显垂直
+  if (ratio < 0.2) return 'v';   // 竖: 极垂直(dx≈0),近垂直撇(dx<0)留给 d
 
   // 对角线方向
   if (dx < 0 && dy > 0) return 'd';  // 撇: 右上到左下
-  if (dx > 0 && dy > 0) return 'u';  // 捺: 左上到右下
-  if (dx < 0 && dy < 0) return 'd';  // 反向撇（少）
-  if (dx > 0 && dy < 0) return 'u';  // 反向捺（少）
+  if (dx > 0 && dy > 0) {
+    // V2.4:捺 vs 点 —— 用行程长度区分
+    return pathLen >= DOT_MAX_LEN ? 'u' : 'p';
+  }
+  if (dx < 0 && dy < 0) return 'd';  // 反向撇（罕）
+  if (dx > 0 && dy < 0) {
+    // V2.4:短行程右上方笔画 → 点/点2,长行程 → 提(归横类)
+    return pathLen < DOT_MAX_LEN ? 'p' : 'h';
+  }
 
   // 默认
   if (absDx >= absDy) return 'h';
@@ -300,11 +510,14 @@ function convertChar(charName) {
       return null;
     }
 
+    // V2.4 逐字归一化:每个字独立计算包围盒(含 SVG 轮廓)+居中缩放
+    var charNorm = computeCharNormalize(medians, rawStrokes);
+
     var strokes = [];
     for (var i = 0; i < medians.length; i++) {
       var median = medians[i];
-      // 缩放坐标并简化为关键点
-      var points = simplifyPoints(median, SCALE);
+      // 坐标归一化 + Douglas-Peucker 简化
+      var points = simplifyPoints(median, charNorm);
       var direction = classifyDirection(median);
 
       var stroke = {
@@ -312,21 +525,28 @@ function convertChar(charName) {
         direction: direction
       };
 
-      // V2.4 阶段 2:JSON 模式输出 svgPath
+      // V2.4 JSON 模式:输出归一化后的 SVG path
       if (MODE === 'json' && rawStrokes && rawStrokes[i]) {
-        stroke.svgPath = scaleSvgPath(rawStrokes[i], SCALE);
+        stroke.svgPath = normalizeSvgPath(rawStrokes[i], charNorm);
       }
 
       strokes.push(stroke);
     }
 
-    // 笔顺纠正: 检测垂直栈并翻转
-    var fixResult = fixStrokeOrder(medians, strokes, charName);
-    if (fixResult.fixed) {
-      fixLog.push(fixResult.log);
+    // V2.4 笔顺纠正: 先贪心匹配(cnchar GB 标准),再垂直栈检测(回退)
+    var gbResult = reorderToGB(medians, strokes, charName);
+    if (gbResult.fixed) {
+      fixLog.push(gbResult.log);
+      strokes = gbResult.strokes;
+    } else {
+      var fixResult = fixStrokeOrder(medians, strokes, charName);
+      if (fixResult.fixed) {
+        fixLog.push(fixResult.log);
+        strokes = fixResult.strokes;
+      }
     }
 
-    return { char: charName, strokes: fixResult.strokes };
+    return { char: charName, strokes: strokes };
   } catch (e) {
     console.error('  [ERR] ' + charName + ': ' + e.message);
     return null;
@@ -337,32 +557,23 @@ function convertChar(charName) {
  * 缩放并简化坐标点
  * 保留起点、终点和关键转折点
  */
-function simplifyPoints(median, scale) {
+function simplifyPoints(median, norm) {
   if (!median || median.length === 0) return [];
 
-  var result = [];
-  // 起点
-  result.push({
-    x: Math.round(median[0][0] * scale),
-    y: Math.round(median[0][1] * scale)
-  });
+  // Douglas-Peucker 简化精度:约 3px 在 200 空间 ≈ 16.6 在 1024 空间
+  var DP_EPSILON = 16;
 
-  // Douglas-Peucker 简化 (epsilon=3 in scaled coordinates)
+  var simplified;
   if (median.length > 2) {
-    var simplified = douglasPeucker(median, 3 / scale, 0, median.length - 1);
-    // 添加除起点外的所有简化点
-    for (var i = 1; i < simplified.length; i++) {
-      result.push({
-        x: Math.round(simplified[i][0] * scale),
-        y: Math.round(simplified[i][1] * scale)
-      });
-    }
-  } else if (median.length === 2) {
-    // 只有两个点，添加终点
-    result.push({
-      x: Math.round(median[1][0] * scale),
-      y: Math.round(median[1][1] * scale)
-    });
+    simplified = douglasPeucker(median, DP_EPSILON, 0, median.length - 1);
+  } else {
+    simplified = [median[0], median[median.length - 1]];
+  }
+
+  var result = [];
+  for (var i = 0; i < simplified.length; i++) {
+    var np = normalizePoint(simplified[i][0], simplified[i][1], norm);
+    result.push(np);
   }
 
   return result;
@@ -420,25 +631,82 @@ function perpendicularDist(point, lineStart, lineEnd) {
 }
 
 /**
- * V2.4 阶段 2(异步加载架构)启用:scaleSvgPath() 函数
+ * V2.4 坐标归一化版: SVG path 从 1024 空间映射到 200 空间(带 margin)
+ * 同时做贝塞尔曲线简化(Q/C/T → L),用 nonzero 填充渲染
  *
- * 函数功能:把 SVG path 从 1024 坐标系缩放到 200 坐标系 + 贝塞尔曲线简化
- * 让底字层和虚线引导层用同源的 Arphic 楷体字形数据
- * 解决原版"系统 sans-serif 字体 vs Arphic 楷体"不贴合的视觉割裂问题
- *
- * V2.4 JSON 模式输出到云函数 strokeCache,本函数在 convertChar 调用
+ * SVG 命令结构:
+ *   M x y / L x y         → 保留端点,归一化坐标
+ *   Q cx cy x y           → 简化为 L,只保留终点
+ *   C cx1 cy1 cx2 cy2 x y → 简化为 L,只保留终点
+ *   T x y                 → 简化为 L,只保留终点
+ *   Z                     → 保留
  */
-function scaleSvgPath(svgPath, scale) {
+function normalizeSvgPath(svgPath, norm) {
   if (!svgPath) return '';
-  // 缩放所有数字(保留 1 位小数,精度 200×0.1 = 0.2 屏幕像素,儿童描红够用)
-  var scaled = svgPath.replace(/(-?\d+\.?\d*)/g, function(m) {
-    return (parseFloat(m) * scale).toFixed(1);
-  });
-  // 贝塞尔曲线简化(Q→L、C→L、T→L)—— 节省 40-50% 数据
-  scaled = scaled.replace(/Q\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/g, 'L $3 $4');
-  scaled = scaled.replace(/C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/g, 'L $5 $6');
-  scaled = scaled.replace(/T\s+(\S+)\s+(\S+)/g, 'L $1 $2');
-  return scaled;
+  var tokens = svgPath.match(/[A-Za-z]|-?\d+\.?\d*(?:[eE][+-]?\d+)?/g);
+  if (!tokens) return '';
+
+  var result = [];
+  var i = 0;
+
+  // 坐标翻转补偿: WeChat createPath2D 渲染时会翻转,数据层预先翻回来使最终显示正常
+  function flipCoord(np) {
+    return { x: 200 - np.x, y: 200 - np.y };
+  }
+
+  function pushFlipped(np) {
+    var f = flipCoord(np);
+    result.push(f.x.toFixed(1), f.y.toFixed(1));
+  }
+
+  while (i < tokens.length) {
+    var token = tokens[i];
+    var cmd = token.toUpperCase();
+
+    if (cmd === 'Z') {
+      result.push('Z');
+      i++;
+    } else if (cmd === 'M') {
+      if (i + 2 < tokens.length) {
+        result.push('M');
+        var np = normalizePoint(parseFloat(tokens[i + 1]), parseFloat(tokens[i + 2]), norm);
+        pushFlipped(np);
+        i += 3;
+      } else { i++; }
+    } else if (cmd === 'Q') {
+      if (i + 4 < tokens.length) {
+        result.push('L');
+        var np = normalizePoint(parseFloat(tokens[i + 3]), parseFloat(tokens[i + 4]), norm);
+        pushFlipped(np);
+        i += 5;
+      } else { i++; }
+    } else if (cmd === 'C') {
+      if (i + 6 < tokens.length) {
+        result.push('L');
+        var np = normalizePoint(parseFloat(tokens[i + 5]), parseFloat(tokens[i + 6]), norm);
+        pushFlipped(np);
+        i += 7;
+      } else { i++; }
+    } else if (cmd === 'T') {
+      if (i + 2 < tokens.length) {
+        result.push('L');
+        var np = normalizePoint(parseFloat(tokens[i + 1]), parseFloat(tokens[i + 2]), norm);
+        pushFlipped(np);
+        i += 3;
+      } else { i++; }
+    } else if (cmd === 'L') {
+      if (i + 2 < tokens.length) {
+        result.push('L');
+        var np = normalizePoint(parseFloat(tokens[i + 1]), parseFloat(tokens[i + 2]), norm);
+        pushFlipped(np);
+        i += 3;
+      } else { i++; }
+    } else {
+      i++; // 跳过未知 token
+    }
+  }
+
+  return result.join(' ');
 }
 
 // ==================== 主程序 ====================
