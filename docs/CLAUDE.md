@@ -193,19 +193,35 @@ this.setData(Object.assign({
 
 ### 描红字形贴合架构（V2.4 阶段 1 + 阶段 2）
 
-**问题：** 原版描红底字用系统 `sans-serif` 字体渲染，跟 `stroke-data.js` 用的 Arphic 楷体（Make Me a Hanzi 数据源）字形不一致 → "底字字形"和"虚线引导"对不上，儿童描红时方向/位置偏差明显。
+**问题：** 原版描红底字用系统 `sans-serif` 字体渲染，跟 `stroke-data.js` 用的 Arphic 楷体（Make Me a Hanzi 数据源）字形不一致 → "底字字形"和"虚线引导"对不上，儿童描红时方向/位置偏差明显。此外，原始 1024×1024 坐标系 46.6% 字符 Y 为负值，简单缩放导致底字被 canvas `overflow:hidden` 裁切。
 
 **V2.4 阶段 1（已上线）：** 切换到系统楷体
 - `pages/learn/learn.js` 底字字体从 `'140px sans-serif'` 改为 `'140px "Kaiti", "STKaiti", "楷体", serif'`
 - 改善但有上限：系统楷体各家略有差异，**无法 100% 贴合** Arphic 楷体
 - 字号 `140px` 保留 V2.3 修复值（预留 15% 边距避免贴框）
 
-**V2.4 阶段 2（Day 1+2 已实现，待用户验收）：** 用 SVG path 渲染底字
+**V2.4 阶段 2（已实现，待用户验收）：** 用 SVG path 渲染底字
 - 数据：2256 个 JSON 拆到 `cloudfunctions/main/strokeCache/<字>.json`（每字 1-3KB，含 `svgPath`）
 - 主包 `utils/stroke-data.js` 保持 1.6MB（无 svgPath）以装下 2MB 限制
 - `pages/learn/learn.js` 加 `loadStrokeData(char)` 和 `preloadStrokeData(chars)` 异步函数
 - `initStep3` 流程：先用本地 medians 显示（无白屏）→ 异步拉云函数 strokeCache 升级 strokePaths → 拉到失败 fallback 同步数据
-- 关键代码路径：`loadStrokeData` 查 `wx.getStorageSync` 本地缓存 → 缓存未命中调 `wx.cloud.callFunction({name: 'main', data: {action: 'getStrokeData', data: {char}}})` → 拉到的数据 `wx.setStorageSync` 写回缓存
+- 关键代码路径：`loadStrokeData` 查 `wx.getStorageSync` 本地缓存 → 缓存未命中调 `wx.cloud.callFunction` → 拉到的数据 `wx.setStorageSync` 写回缓存
+
+**Canvas 坐标系修复（2026-06-03）：**
+- 微信 `400rpx` CSS 尺寸在不同设备上 ≠ `200px`（如某设备 dpr=3 时实际 207.258px）
+- `drawStrokeGuide` 改为固定 200×200 逻辑坐标系：`canvas.width = 200 * dpr`、`canvas.height = 200 * dpr`、`ctx.scale(dpr, dpr)`
+- `scaleX = scaleY = 1`（不做 CSS像素→逻辑坐标换算），所有渲染坐标基于 200×200
+
+**SVG Path 坐标翻转：**
+- WeChat `canvas.createPath2D()` 渲染时 SVG path 显示为镜像+倒置
+- `normalizeSvgPath()` 在数据层预先翻转所有坐标：`(x, y) → (200-x, 200-y)`
+- 配合逐字归一化使底字正确居中在 200×200 画布内
+- 底字用 `ctx.fill(p, 'evenodd')` 填充（`nonzero` 在微信 canvas 不生效）
+
+**笔顺纠正增强（2026-06-03）：**
+- `classifyDirection()` 从 5 类扩展到 7 类（h/v/d/u/p/t），拆分捺(u)和点(p)
+- 新增 `reorderToGB()` 贪心匹配算法：cnchar GB 标准 × hw 笔画方向/类型/折数/空间位置 → 得分提升 >1.1× 才重排（~341 字）
+- `fixStrokeOrder()` 垂直栈检测作为回退（~952 字），共计纠正 ~1293 字
 
 **为什么拆 JSON 不放主包：** 完整 svgPath 数据约 4.5MB，超过主包 2MB 限制。`strokeCache/` 随云函数部署，**不占主包**。
 
@@ -246,11 +262,22 @@ node scripts/convert-stroke-data.js
 node scripts/convert-stroke-data.js --mode=json
 ```
 
+**核心算法：**
+
+| 步骤 | 函数 | 说明 |
+|------|------|------|
+| 逐字归一化 | `computeCharNormalize(medians, rawStrokes)` | 含 SVG 轮廓的包围盒 → 居中缩放至 200×200（MARGIN=10） |
+| 坐标缩放+简化 | `simplifyPoints(median, norm)` | Douglas-Peucker epsilon=16（1024空间），保留起点/终点/转折点 |
+| SVG 路径处理 | `normalizeSvgPath(svgPath, norm)` | Q/C/T→L 简化 + 逐字归一化 + `(200-x,200-y)` 翻转补偿 |
+| 方向分类 | `classifyDirection(points)` | 7 类: h/v/d/u/p/t（捺/点拆分，阈值 DOT_MAX_LEN=350） |
+| 笔顺纠正-主 | `reorderToGB(medians, strokes, char)` | cnchar GB 标准贪心匹配（方向 100 + 类型 50 + 折数 15 + 位置 20） |
+| 笔顺纠正-回退 | `fixStrokeOrder(medians, strokes, char)` | 垂直栈 Y-重叠检测翻转（xThreshold=250, overlapThreshold=0.3） |
+
 **模式差异：**
 | 模式 | 输出 | svgPath | 用途 |
 |------|------|---------|------|
 | JS（默认） | `utils/stroke-data.js` | 不输出 | 主包数据 |
-| JSON | `cloudfunctions/main/strokeCache/*.json` | 输出（toFixed 1 + Q/C/T 简化） | 云函数本地数据 |
+| JSON | `cloudfunctions/main/strokeCache/*.json` | 输出（翻转+归一化, toFixed 1, Q/C/T→L） | 云函数本地数据 |
 
 ## 已完成功能
 
@@ -288,6 +315,7 @@ node scripts/convert-stroke-data.js --mode=json
 - [x] **V2.4 阶段 1**：描红底字字体改系统楷体（Kaiti / STKaiti / 楷体 fallback）+ 字号保留 V2.3 修复值 140px
 - [x] **V2.4 阶段 2 Day 1**：笔顺数据拆分到云函数 `cloudfunctions/main/strokeCache/<字>.json`（2256 个，4.5MB 总），加 `getStrokeData` 云函数 action（支持单字 + 批量）
 - [x] **V2.4 阶段 2 Day 2**：`pages/learn/learn.js` 加 `loadStrokeData` + `preloadStrokeData` 异步函数，`initStep3` 改造：先同步 medians 显示无白屏 + 异步拉 svgPath 升级 + 失败 fallback 同步数据
+- [x] **V2.4 阶段 2 Day 3**：Canvas 坐标系修复（固定 200×200 逻辑坐标，解耦 rpx→px 设备差异）+ SVG path 坐标翻转补偿 + 逐字归一化含 SVG 轮廓包围盒 + 笔顺纠正增强（7类方向 + reorderToGB 贪心匹配 + 1293字纠正）
 - [x] **V2.4 调研**：`描红功能调研_横纵分析报告.md`（根目录），调研主流产品（洪恩 / 有道 / 河小象 / 麦田 等）+ Hanzi Writer / Make Me a Hanzi 开源方案，输出 3 个技术选型方案
 
 ## 已修复Bug
