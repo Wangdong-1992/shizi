@@ -531,7 +531,11 @@ Page({
         self.setData({
           comboCount: comboCount,
           showCombo: true,
-          comboLevel: comboResult.level,
+          // comboLevel: WXML 只用 === 'super' 判断是否加 super-combo-glow 样式.
+          //   getComboLevel() 不返回 level 字段, 原来写 comboResult.level 永远是 undefined,
+          //   触发 'Setting data field "comboLevel" to undefined is invalid' 警告.
+          //   改用 comboCount 直接判定 (>=10 是 super 连击).
+          comboLevel: comboCount >= 10 ? 'super' : '',
           comboIcon: comboResult.icon,
           _correctCount: _correctCount,
           _maxCombo: _maxCombo
