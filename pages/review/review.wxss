@@ -46,6 +46,15 @@ page {
   box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
 }
 
+/* 看字说音 (speak_char): 内容只有 1 个大字 + 录音按钮, 撑开卡片让视觉居中 */
+.question-area.speak-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 55vh;
+  justify-content: center;
+}
+
 /* ====== R-12: 看拼音选字 - 拼音展示 ====== */
 .pinyin-display {
   text-align: center;

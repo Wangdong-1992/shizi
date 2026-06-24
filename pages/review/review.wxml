@@ -59,7 +59,8 @@
   </view>
 
   <!-- ========== 题型2: 看字说音 (speak_char) ========== -->
-  <view wx:if="{{questionType === 'speak_char' && currentChar}}" class="question-area card-entrance">
+  <!-- 视觉居中: 看字说音只有 1 个大字 + 录音按钮, 内容少, 用 min-height 撑开卡片让内容垂直居中 -->
+  <view wx:if="{{questionType === 'speak_char' && currentChar}}" class="question-area speak-mode card-entrance">
     <view class="type-hint">{{questionTypeHint}}</view>
     <view class="char-display">{{currentChar}}</view>
 
