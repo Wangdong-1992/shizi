@@ -682,6 +682,11 @@ Page({
   startRecord: function() {
     if (this.data.isRecording) return;
     if (this.data.step4Answered) return;
+    // M7: 先清掉上一次可能悬挂的 4.5s 超时计时器, 避免旧 timeout 在新录音中途强停
+    if (this.recordTimeout) {
+      clearTimeout(this.recordTimeout);
+      this.recordTimeout = null;
+    }
     this.setData({ isRecording: true, feedbackShow: false });
 
     this.recordStartTime = Date.now();
@@ -705,7 +710,12 @@ Page({
    */
   stopRecord: function() {
     if (!this.data.isRecording) return;
-    clearTimeout(this.recordTimeout);
+    // M7: 无论 duration < 500 还是正常路径, 都要清掉 4.5s 强制超时计时器
+    //   否则短按分支 return 后, 旧 timeout 仍在跑, 后续录音会被它强停
+    if (this.recordTimeout) {
+      clearTimeout(this.recordTimeout);
+      this.recordTimeout = null;
+    }
 
     var duration = Date.now() - (this.recordStartTime || Date.now());
 

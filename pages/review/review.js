@@ -90,6 +90,28 @@ Page({
     this.loadReview();
   },
 
+  // M1: 录音中切 tab / 返回 / 跳走时清理 recorderManager, 避免麦克风持续占用
+  //   recorderManager 是 wx 全局单例, 不随 Page 卸载, onStop 回调闭包持有 self 引用
+  onUnload: function() {
+    var self = this;
+    try {
+      if (self.recordTimeout) {
+        clearTimeout(self.recordTimeout);
+        self.recordTimeout = null;
+      }
+      if (self.data && self.data.recording) {
+        var rm = wx.getRecorderManager();
+        // 解绑 onStop 回调, 避免卸载后回调还在跑引用旧 Page
+        rm.onStop(function () {});
+        rm.onError(function () {});
+        rm.stop();
+      }
+      self.setData({ recording: false, asrProcessing: false });
+    } catch (e) {
+      console.error('review onUnload cleanup error:', e);
+    }
+  },
+
   // ========== 加载复习内容 ==========
   loadReview: function() {
     var self = this;

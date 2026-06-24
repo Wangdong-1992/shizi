@@ -12,6 +12,12 @@
     <text>加载中...</text>
   </view>
 
+  <!-- M5: 网络错误状态, 区别于"真的没数据"的空状态 -->
+  <view wx:elif="{{networkError}}" class="empty-state">
+    <text class="empty-text">😢 加载失败</text>
+    <text class="empty-link" bindtap="retryLoad">点击重试</text>
+  </view>
+
   <!-- 空状态 -->
   <view wx:elif="{{empty}}" class="empty-state">
     <text class="empty-text">还没有掌握汉字哦</text>

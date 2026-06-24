@@ -310,12 +310,16 @@ Page({
           self.savePushSetting(true);
         } else {
           wx.showToast({ title: '授权后才能推送提醒哦', icon: 'none' });
+          // M2: 用户拒绝授权, switch 已拨到开, 需要回滚到 false
+          self.setData({ pushSubscribed: false });
         }
       } catch (err) {
         console.error('requestSubscribeMessage error:', err);
         // 用户拒绝或基础库不支持时降级
         if (err.errMsg && err.errMsg.indexOf('cancel') !== -1) {
           wx.showToast({ title: '已取消', icon: 'none' });
+          // M2: 用户取消, switch 已拨到开, 回滚
+          self.setData({ pushSubscribed: false });
         } else {
           // 降级：直接保存设置，不请求授权
           wx.showModal({
@@ -324,6 +328,9 @@ Page({
             success: function(modalRes) {
               if (modalRes.confirm) {
                 self.savePushSetting(true);
+              } else {
+                // M2: 用户取消降级弹窗, switch 已拨到开, 回滚
+                self.setData({ pushSubscribed: false });
               }
             }
           });
@@ -352,6 +359,8 @@ Page({
       });
     } catch (err) {
       console.error('savePushSetting error:', err);
+      // M2: 云函数调用失败, switch 已被用户拨动, 需要回滚
+      self.setData({ pushSubscribed: !subscribed });
       wx.showToast({ title: '设置失败，请重试', icon: 'none' });
     }
   },
