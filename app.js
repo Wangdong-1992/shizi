@@ -27,20 +27,36 @@ App({
     if (this.globalData.openid) {
       return Promise.resolve(this.globalData.openid);
     }
-    return new Promise((resolve, reject) => {
+    var self = this;
+    return new Promise(function (resolve) {
+      var done = false;
+      var finish = function (val) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(val);
+      };
+      // 兜底超时: dev tools 环境里 login 偶尔会 30s+ 才回,SDK 3.16.0 在
+      //   timeout 时不一定触发 fail 回调,导致首页 spinner 永远卡住.
+      //   8s 兜底后降级到 guest_<ts>, 走原有 fallback 路径.
+      var timer = setTimeout(function () {
+        console.warn('[getOpenid] login 超时, 降级为 guest_');
+        self.globalData.openid = 'guest_' + Date.now();
+        finish(self.globalData.openid);
+      }, 8000);
+
       wx.cloud.callFunction({
         name: 'login',
-        success: res => {
+        success: function (res) {
           console.log('login success:', res.result);
-          this.globalData.openid = res.result.openid;
-          resolve(res.result.openid);
+          self.globalData.openid = res.result.openid;
+          finish(res.result.openid);
         },
-        fail: err => {
+        fail: function (err) {
           console.error('获取openid失败', err);
-          // 失败时使用临时id
-          const tempId = 'guest_' + Date.now();
-          this.globalData.openid = tempId;
-          resolve(tempId);
+          var tempId = 'guest_' + Date.now();
+          self.globalData.openid = tempId;
+          finish(tempId);
         }
       });
     });

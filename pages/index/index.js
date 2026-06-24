@@ -231,10 +231,12 @@ Page({
   // ========== 加载首页数据 ==========
   loadIndexData: async function() {
     var self = this;
-    // B12: 防 onShow 重复触发. 用户在 review/learn 页停留后切回首页,
-    //   onShow → checkLoginStatus → loadIndexData, 第一次还在 await 时第二次又触发,
-    //   两组 Promise.all 竞争 setData 导致数字跳动 / entranceReady 闪烁.
-    if (self.data.loading) return;
+    // B12 加强: 用 _loadingFlag 内部变量防止 onShow 重复触发时的并发请求,
+    //   finally 保证 loading: false 一定会执行(即使 catch 之前的 await 挂起
+    //   触发的 SDK timeout 错误没冒到 catch, finally 也不会跑——这是 JS 语义,
+    //   所以根因修复仍在 app.getOpenid 的 8s 兜底超时).
+    if (self._loadingFlag) return;
+    self._loadingFlag = true;
     self.setData({ loading: true, entranceReady: false });
 
     try {
@@ -305,6 +307,9 @@ Page({
       console.error('加载首页数据失败:', err);
       wx.showTabBar();
       self.setData({ loading: false });
+    } finally {
+      // 保证 _loadingFlag 一定复位, 即使 catch 未运行也允许下次 loadIndexData
+      self._loadingFlag = false;
     }
   },
 
