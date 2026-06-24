@@ -519,17 +519,22 @@ exports.main = async (event, context) => {
 
     // ============================================================
     // 鉴权 (B1): 非 wxLogin action 必须用 wxContext 真实 openid, 防止横向越权
+    //   - 公共查询 action (无需 openid): 跳过鉴权, 直接放行
     //   - devMode=true: 走 DEV_OPENIDS 白名单, 不校验 wxContext (dev tools 必备)
     //   - 生产路径(realOpenid 存在, 无 devMode): data.openid 必须等于 wxContext.OPENID
-    //   - 云端调试路径(realOpenid 为空, 无 devMode): 拒
     // ============================================================
+    const PUBLIC_ACTIONS = ['getOptions', 'getQuestionOptions', 'getAudio'];
+    const DEV_OPENIDS = (process.env.DEV_OPENIDS || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     const wxContext = cloud.getWXContext();
     const realOpenid = wxContext.OPENID;
     if (action !== 'wxLogin') {
-      const DEV_OPENIDS = (process.env.DEV_OPENIDS || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-      if (data.devMode) {
-        // devMode: 走白名单, 不校验 wxContext (WeChat DevTools 的 wxContext.OPENID
-        //   与 login 返回的 openid 不一致, 这是 DevTools 的特性, 不是 bug)
+      if (PUBLIC_ACTIONS.indexOf(action) !== -1) {
+        // 公共查询: 只读 characters 表, 不涉及用户数据, 不需鉴权
+        // 注: 生产路径仍需加 rate limit 防止 Baidu TTS 滥用, 后续单独做
+      } else if (data.devMode) {
+        // devMode + 用户 action: 走白名单 (dev tools 必备)
+        //   WeChat DevTools 的 wxContext.OPENID 与 login 返回的 openid 不一致,
+        //   这是 DevTools 的特性不是 bug, 用白名单绕过.
         if (DEV_OPENIDS.indexOf(String(data.openid || '')) === -1) {
           return { success: false, error: '鉴权失败: devMode 未授权' };
         }
