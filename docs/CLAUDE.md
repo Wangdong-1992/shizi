@@ -16,7 +16,7 @@
 ```
 E:/claude/PMRD/shizi/
 ├── docs/                              # 产品文档
-│   ├── 儿童识字应用_PRD_V2.0.0.md      # 产品需求文档
+│   ├── 儿童识字应用_PRD_V2.5.0.md      # 产品需求文档（当前版本）
 │   ├── 一级字表_拼音.xlsx              # 2256字原始数据
 │   └── CLAUDE.md                      # 本文件（项目约定）
 ├── pages/                             # 页面目录
@@ -27,18 +27,18 @@ E:/claude/PMRD/shizi/
 │   ├── mastered/                      # 已掌握汉字列表
 │   └── settings/                      # 设置页
 ├── scripts/
-│   ├── convert-stroke-data.js          # 笔顺数据生成（hanzi-writer-data + cnchar校准）
-│   ├── verify-regenerated.js           # 笔顺验证（检查生成后2256字笔顺正确性）
-│   └── audit-stroke-order.js           # 源数据审计（检查hanzi-writer-data原始笔顺问题）
+│   └── smoke-test.js                  # 冒烟测试
 ├── utils/
 │   ├── delight.js                      # V2.0 愉悦体验引擎
 │   ├── spaced-repetition.js            # V2.2 间隔重复算法模块
-│   └── stroke-data.js                  # 笔顺路径数据（2256字）
+│   ├── audio.js                        # V2.3 TTS自动重试
+│   ├── progressive-hint.js             # V2.3 渐进提示
+│   └── error-classifier.js            # V2.3 错因分类
 ├── cloudfunctions/                    # 云函数
 │   ├── login/                         # 获取openid
-│   ├── main/                          # 主业务逻辑（14个action）
+│   ├── main/                          # 主业务逻辑（22个action，V2.5.1起无描红）
 │   ├── fixData/                       # 数据修复
-│   └── import_chardata/               # 汉字数据导入
+│   └── import_chardata/             # 汉字数据导入
 ├── images/                            # TabBar图标
 ├── app.js                             # 应用入口
 ├── app.json                           # 全局配置
@@ -73,7 +73,10 @@ E:/claude/PMRD/shizi/
   "mastered_chars": [],
   "last_learn_date": "",
   "token": "xxx",
-  "token_expire": "Date"
+  "token_expire": "Date",
+  "age": null,                    // V2.4 宝宝年龄(3-6,null 表示未设置,前端 fallback 5 岁)
+  "push_subscribed": false,       // R-15 复习提醒订阅
+  "max_combo": 0                  // R-14 个人最佳连击
 }
 ```
 
@@ -100,7 +103,7 @@ E:/claude/PMRD/shizi/
 
 ## 云函数接口 (main)
 
-> **当前数量：22 个 action**（截至 V2.3）。所有业务逻辑统一在 `cloudfunctions/main/index.js` 的 switch 路由里，按"用户/学习/复习/统计/语音/运维"六类分。
+> **当前数量：23 个 action**（截至 V2.4 阶段 2）。所有业务逻辑统一在 `cloudfunctions/main/index.js` 的 switch 路由里，按"用户/学习/复习/统计/语音/运维"六类分。
 
 | action | 说明 | 参数 |
 |--------|------|------|
@@ -181,12 +184,13 @@ this.setData(Object.assign({
 **它重置的字段**（25+ 个，统一收口，未来新增"切字时需要清零"的字段只在这里加一次）：
 - 四步状态机本体：`currentStep / stepCompleted / stepResults / learnCompleted / finalResult / feedbackShow`
 - Step2 再认：`step2Options / step2Answered / step2Correct / step2SelectedId`
-- Step3 描红：`strokePaths / strokeIndex / strokeCompleted / hasStrokeData / totalStrokes / strokeDeviation`
 - Step4 跟读：`step4Correct / step4Answered / asrFailed / asrProcessing / showChoiceMode / choiceOptions`
 - V2.3 渐进提示：`charErrorCount / showProgressiveHint / progressiveHintText / progressiveHintLevel`
 - R-13 每日配额：`dailyQuotaReached / dailyQuotaReason`
 
 **为什么需要它：** 修复 V2.2 上线后"上一个字学完直接进入下一个字时残留 learnCompleted=true"导致的"学会了"弹窗 bug（V2.3 修复 1）。
+
+## V2.4 新增工具
 
 ## 已完成功能
 
@@ -211,7 +215,6 @@ this.setData(Object.assign({
 - [x] 间隔重复引擎（V2.2）：utils/spaced-repetition.js + Leitner Box (1-5级) + 五级掌握状态机 + 优先级调度
 - [x] 四步递进学习页重构（V2.2）：释义→再认→描红→跟读，单页状态机
 - [x] 复习页适配（V2.2）：Box升降反馈 + 状态变迁提示 + exerciseType参数
-- [x] 笔顺数据生成（V2.2）：scripts/convert-stroke-data.js + hanzi-writer-data → cnchar校准 + Y-overlap垂直栈翻转 → 2256字完整笔顺数据(GB 13000.1)，1197字自动纠正
 - [x] 旧数据按需迁移（V2.2）：migrateProgress云函数，首页首次访问触发
 - [x] 云函数 recordReview 三写闭环：review_logs + learning_progress + 状态信息返回
 - [x] **V2.3 P0 修复**：密钥从代码中剥离，改用云函数环境变量
@@ -221,6 +224,7 @@ this.setData(Object.assign({
 - [x] **V2.3**：云函数新增 resetUserData action（清空当前用户学习数据）
 - [x] **V2.3**：settings 页加 "清除学习数据" 按钮（带二次确认）
 - [x] **V2.3 架构优化**：pages/learn/learn.js 抽出 resetLearnStateMachine 公共方法，loadChar / checkMasteredChar 共用
+- [x] **V2.5.1**：删除描红功能（Step3），学习页改为三步流程（释义→再认→跟读）
 
 ## 已修复Bug
 
@@ -289,6 +293,8 @@ this.setData(Object.assign({
 7. **跨比对一致性**：首页统计和列表页统计使用相同的 `learning_progress` 查询条件（V2.3 起统一源）
 8. **切字必重置**：learn / review 等页面切字时**必须**调 `resetLearnStateMachine()`（或在 review 的 `showCurrentQuestion` 写完整重置 setData），避免上一个字的状态残留
 9. **密钥不进代码**：微信 AppSecret、百度 API Key/Secret 等敏感配置**必须**用云函数环境变量（`process.env`），代码里 `if (!xxx) throw new Error` 兜底，缺变量直接 fail 不静默
+10. **主包 2MB 红线**：微信小程序主包硬限制 2MB。新增目录/批量文件前，必须判断这东西是不是该进主包——云函数代码、脚本、文档、node_modules 都不进——如果确定不进，立刻同步更新 `project.config.json` 的 `packOptions.ignore`。写完代码后跑一次「上传」看预估包大小，不要等提测才发现超限。当前排除清单见 `project.config.json` 的 `packOptions.ignore`
+11. **算法抽离优先于库强集成（V2.5 教训→V2.5.1 反转）**：V2.5 抽算法移植了 hanzi-writer 4-check 评分，V2.5.1 验证后发现：描红功能本身被删除，stroke-grader 模块随之移除。此原则仍有效（适用于有长期价值的算法），但需先确认功能是否保留再决定是否抽算法。
 
 ## 部署步骤
 

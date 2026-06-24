@@ -1,8 +1,8 @@
 <view class="container">
-  <!-- 模式切换 -->
-  <view class="mode-tabs">
-    <text class="tab {{mode === 'listen' ? 'active' : ''}}" bindtap="switchMode" data-mode="listen">听音选字</text>
-    <text class="tab {{mode === 'speak' ? 'active' : ''}}" bindtap="switchMode" data-mode="speak">看字说音</text>
+  <!-- R-12: 题型标签 -->
+  <view class="question-type-tag" wx:if="{{questionTypeLabel}}">
+    <text class="type-tag-icon">{{questionTypeIcon}}</text>
+    <text class="type-tag-label">{{questionTypeLabel}}</text>
   </view>
 
   <!-- 连击徽章 -->
@@ -25,14 +25,13 @@
     </view>
   </view>
 
-  <!-- 题目区域 - 听音选字模式 -->
-  <view wx:if="{{mode === 'listen' && currentChar}}" class="question-listen card-entrance">
-    <view class="listen-hint">点击播放按钮，听发音后选择正确答案</view>
+  <!-- ========== 题型1: 听音选字 (listen_char) ========== -->
+  <view wx:if="{{questionType === 'listen_char' && currentChar}}" class="question-area card-entrance">
+    <view class="type-hint">{{questionTypeHint}}</view>
     <button class="play-btn" bindtap="playAudio">
       <text class="play-icon">🔊</text>
     </button>
 
-    <!-- 选项 -->
     <view class="options-grid">
       <view
         wx:for="{{options}}"
@@ -45,7 +44,12 @@
       </view>
     </view>
 
-    <!-- 反馈卡片 -->
+    <view wx:if="{{showProgressiveHint}}" class="progressive-hint hint-level-{{progressiveHintLevel}}">
+      <text class="progressive-hint-icon">{{progressiveHintLevel === 3 ? '📖' : '💡'}}</text>
+      <text class="progressive-hint-text">{{progressiveHintText}}</text>
+      <text wx:if="{{progressiveHintLevel < 3}}" class="progressive-hint-retry">再试一次</text>
+    </view>
+
     <view class="feedback-row" wx:if="{{answered}}">
       <view class="feedback-card {{feedbackType}}">
         <text class="feedback-icon">{{feedbackIcon}}</text>
@@ -54,8 +58,9 @@
     </view>
   </view>
 
-  <!-- 题目区域 - 看字说音模式 -->
-  <view wx:if="{{mode === 'speak' && currentChar}}" class="question-speak card-entrance">
+  <!-- ========== 题型2: 看字说音 (speak_char) ========== -->
+  <view wx:if="{{questionType === 'speak_char' && currentChar}}" class="question-area card-entrance">
+    <view class="type-hint">{{questionTypeHint}}</view>
     <view class="char-display">{{currentChar}}</view>
 
     <button wx:if="{{!asrProcessing && !showFallbackChoice && !answered}}" class="record-btn {{recording ? 'recording' : ''}}" bindtouchstart="startRecord" bindtouchend="stopRecord">
@@ -63,12 +68,10 @@
       <text class="record-text">{{recording ? '录音中...' : '按住说出发音'}}</text>
     </button>
 
-    <!-- ASR处理中 -->
     <view wx:if="{{asrProcessing}}" class="asr-processing">
       <text class="asr-text">🔍 正在识别...</text>
     </view>
 
-    <!-- ASR失败降级选择题 -->
     <view wx:if="{{showFallbackChoice}}" class="fallback-choice">
       <view class="fallback-hint">🔊 语音识别暂不可用，请选择正确答案</view>
       <view class="options-grid">
@@ -80,7 +83,101 @@
       </view>
     </view>
 
-    <!-- 反馈卡片 -->
+    <view class="feedback-row" wx:if="{{answered}}">
+      <view class="feedback-card {{feedbackType}}">
+        <text class="feedback-icon">{{feedbackIcon}}</text>
+        <text class="feedback-text">{{feedbackMsg}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ========== 题型3: 看字选义 (char_meaning) ========== -->
+  <view wx:if="{{questionType === 'char_meaning' && currentChar}}" class="question-area card-entrance">
+    <view class="type-hint">{{questionTypeHint}}</view>
+    <view class="char-display meaning-char">{{currentChar}}</view>
+    <text class="meaning-pinyin">{{currentPinyin}}</text>
+
+    <view class="text-options-grid" wx:if="{{meaningOptions.length > 0}}">
+      <view
+        wx:for="{{meaningOptions}}"
+        wx:key="id"
+        class="text-option-item {{selectedId === item.id ? 'selected' : ''}} {{answered ? (item.isCorrect ? 'correct-pop' : (selectedId === item.id ? 'wrong-shake' : '')) : ''}}"
+        bindtap="selectMeaning"
+        data-id="{{item.id}}"
+      >
+        <text class="option-text">{{item.text}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{showProgressiveHint}}" class="progressive-hint hint-level-{{progressiveHintLevel}}">
+      <text class="progressive-hint-icon">{{progressiveHintLevel === 3 ? '📖' : '💡'}}</text>
+      <text class="progressive-hint-text">{{progressiveHintText}}</text>
+      <text wx:if="{{progressiveHintLevel < 3}}" class="progressive-hint-retry">再试一次</text>
+    </view>
+
+    <view class="feedback-row" wx:if="{{answered}}">
+      <view class="feedback-card {{feedbackType}}">
+        <text class="feedback-icon">{{feedbackIcon}}</text>
+        <text class="feedback-text">{{feedbackMsg}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ========== 题型4: 看拼音选字 (pinyin_char) ========== -->
+  <view wx:if="{{questionType === 'pinyin_char' && currentChar}}" class="question-area card-entrance">
+    <view class="type-hint">{{questionTypeHint}}</view>
+    <view class="pinyin-display">{{currentPinyin}}</view>
+
+    <view class="options-grid" wx:if="{{options.length > 0}}">
+      <view
+        wx:for="{{options}}"
+        wx:key="id"
+        class="option-item {{selectedId === item.id ? 'selected' : ''}} {{answered ? (item.isCorrect ? 'correct-pop' : (selectedId === item.id ? 'wrong-shake' : '')) : ''}}"
+        bindtap="selectOption"
+        data-id="{{item.id}}"
+      >
+        <text class="option-char">{{item.char}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{showProgressiveHint}}" class="progressive-hint hint-level-{{progressiveHintLevel}}">
+      <text class="progressive-hint-icon">{{progressiveHintLevel === 3 ? '📖' : '💡'}}</text>
+      <text class="progressive-hint-text">{{progressiveHintText}}</text>
+      <text wx:if="{{progressiveHintLevel < 3}}" class="progressive-hint-retry">再试一次</text>
+    </view>
+
+    <view class="feedback-row" wx:if="{{answered}}">
+      <view class="feedback-card {{feedbackType}}">
+        <text class="feedback-icon">{{feedbackIcon}}</text>
+        <text class="feedback-text">{{feedbackMsg}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ========== 题型5: 选词含字 (char_word) ========== -->
+  <view wx:if="{{questionType === 'char_word' && currentChar}}" class="question-area card-entrance">
+    <view class="type-hint">{{questionTypeHint}}</view>
+    <view class="char-display word-char">{{currentChar}}</view>
+    <text class="word-pinyin">{{currentPinyin}}</text>
+
+    <view class="text-options-grid" wx:if="{{wordOptions.length > 0}}">
+      <view
+        wx:for="{{wordOptions}}"
+        wx:key="id"
+        class="text-option-item {{selectedId === item.id ? 'selected' : ''}} {{answered ? (item.isCorrect ? 'correct-pop' : (selectedId === item.id ? 'wrong-shake' : '')) : ''}}"
+        bindtap="selectWord"
+        data-id="{{item.id}}"
+      >
+        <text class="option-text">{{item.text}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{showProgressiveHint}}" class="progressive-hint hint-level-{{progressiveHintLevel}}">
+      <text class="progressive-hint-icon">{{progressiveHintLevel === 3 ? '📖' : '💡'}}</text>
+      <text class="progressive-hint-text">{{progressiveHintText}}</text>
+      <text wx:if="{{progressiveHintLevel < 3}}" class="progressive-hint-retry">再试一次</text>
+    </view>
+
     <view class="feedback-row" wx:if="{{answered}}">
       <view class="feedback-card {{feedbackType}}">
         <text class="feedback-icon">{{feedbackIcon}}</text>

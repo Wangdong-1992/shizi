@@ -19,6 +19,15 @@
       </view>
     </view>
 
+    <!-- V2.4: 宝宝年龄 -->
+    <view class="settings-item" bindtap="showAgeSheet">
+      <text class="settings-label">宝宝年龄</text>
+      <view class="settings-right">
+        <text class="settings-value">{{currentAge ? currentAge + '岁' : '未设置'}}</text>
+        <text class="settings-arrow">›</text>
+      </view>
+    </view>
+
     <!-- R-15: 复习提醒推送 -->
     <view class="settings-item">
       <text class="settings-label">📬 复习提醒</text>
@@ -62,6 +71,29 @@
     <view class="popup-actions">
       <button class="popup-btn cancel" bindtap="closeNicknamePopup">取消</button>
       <button class="popup-btn confirm" bindtap="confirmNickname">确定</button>
+    </view>
+  </view>
+
+  <!-- ========= V2.4 宝宝年龄选择弹窗 ========= -->
+  <view class="popup-mask" wx:if="{{agePopup.show}}" bindtap="closeAgePopup"></view>
+  <view class="popup-sheet {{agePopup.show ? 'popup-show' : ''}}">
+    <text class="popup-title">选择宝宝年龄</text>
+    <text class="popup-hint">宝宝年龄(3-6 岁),用于个性化学习体验</text>
+    <picker
+      mode="selector"
+      range="{{ageRange}}"
+      value="{{agePopup.index}}"
+      bindchange="onAgePickerChange"
+      class="age-picker"
+    >
+      <view class="age-picker-display">
+        <text class="age-picker-text">{{ageRange[agePopup.index]}}</text>
+        <text class="age-picker-arrow">▼</text>
+      </view>
+    </picker>
+    <view class="popup-actions">
+      <button class="popup-btn cancel" bindtap="closeAgePopup">取消</button>
+      <button class="popup-btn confirm" bindtap="confirmAge">确定</button>
     </view>
   </view>
 

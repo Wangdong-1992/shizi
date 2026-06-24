@@ -333,96 +333,6 @@ page {
   90%      { transform: translateX(6rpx); }
 }
 
-/* ==================== Step3: 描红 ==================== */
-.step3-content {
-  padding-top: 24rpx;
-}
-
-.step3-hint {
-  font-size: 30rpx;
-  color: #666;
-  margin-bottom: 32rpx;
-  text-align: center;
-}
-
-.stroke-area {
-  width: 400rpx;
-  height: 400rpx;
-  border-radius: 24rpx;
-  background: white;
-  border: 4rpx dashed #ddd;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
-  margin-bottom: 32rpx;
-  position: relative;
-  overflow: hidden;
-}
-
-.stroke-canvas {
-  width: 400rpx;
-  height: 400rpx;
-}
-
-.stroke-char-display {
-  font-size: 280rpx;
-  font-weight: bold;
-  color: rgba(0, 0, 0, 0.12);
-  line-height: 1;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.stroke-progress {
-  position: absolute;
-  bottom: 16rpx;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 20rpx;
-  padding: 6rpx 24rpx;
-}
-
-.stroke-progress-text {
-  color: white;
-  font-size: 24rpx;
-}
-
-.stroke-area-nodata {
-  background: #f8f8f8;
-}
-
-.stroke-nodata-text {
-  font-size: 28rpx;
-  color: #bbb;
-  margin-top: 16rpx;
-  position: relative;
-  z-index: 1;
-}
-
-.stroke-guide-text {
-  font-size: 24rpx;
-  color: #4A90D9;
-  position: absolute;
-  bottom: 20rpx;
-}
-
-.step3-skip {
-  padding: 20rpx 48rpx;
-  border-radius: 32rpx;
-  background: #f5f5f5;
-  color: #999;
-  font-size: 28rpx;
-  transition: all 0.15s;
-}
-
-.step3-skip:active {
-  background: #eee;
-  color: #666;
-}
-
 /* ==================== Step4: 跟读 ==================== */
 .step4-content {
   padding-top: 16rpx;
@@ -730,4 +640,324 @@ page {
   font-size: 32rpx;
   color: #333;
   box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.1);
+}
+
+/* ==================== V2.3 小复习 ==================== */
+
+/* 小复习进行中 */
+.mini-review-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 40rpx;
+}
+
+.mini-review-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24rpx;
+  margin-bottom: 32rpx;
+}
+
+.mini-review-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #4A90D9;
+}
+
+.mini-review-progress {
+  font-size: 28rpx;
+  color: #999;
+  background: #f5f5f5;
+  padding: 8rpx 24rpx;
+  border-radius: 24rpx;
+}
+
+.mini-review-hint {
+  font-size: 30rpx;
+  color: #666;
+  margin-bottom: 32rpx;
+  text-align: center;
+}
+
+.mini-review-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: linear-gradient(135deg, #4A90D9, #7AB3ED);
+  color: white;
+  padding: 20rpx 48rpx;
+  border-radius: 48rpx;
+  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+  margin-bottom: 40rpx;
+  transition: transform 0.15s;
+}
+
+.mini-review-play:active {
+  transform: scale(0.95);
+}
+
+.mini-review-play-icon {
+  font-size: 36rpx;
+}
+
+.mini-review-play-text {
+  font-size: 28rpx;
+  font-weight: bold;
+}
+
+.mini-review-options {
+  display: flex;
+  justify-content: center;
+  gap: 32rpx;
+  width: 100%;
+}
+
+/* 小复习完成摘要 */
+.mini-review-summary {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 60rpx;
+  animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.summary-card {
+  background: white;
+  border-radius: 40rpx;
+  padding: 56rpx 48rpx;
+  text-align: center;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 560rpx;
+}
+
+.summary-emoji {
+  font-size: 96rpx;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.summary-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+  margin-bottom: 32rpx;
+}
+
+.summary-stats {
+  display: flex;
+  justify-content: center;
+  gap: 80rpx;
+  margin-bottom: 24rpx;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.summary-stat-num {
+  font-size: 64rpx;
+  font-weight: bold;
+}
+
+.summary-stat-num.correct {
+  color: #4CAF50;
+}
+
+.summary-stat-num.wrong {
+  color: #FF9800;
+}
+
+.summary-stat-label {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.summary-detail {
+  margin-bottom: 32rpx;
+}
+
+.summary-detail-text {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.summary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.summary-btn {
+  padding: 24rpx 48rpx;
+  border-radius: 48rpx;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: bold;
+  transition: transform 0.15s;
+}
+
+.summary-btn:active {
+  transform: scale(0.95);
+}
+
+.summary-btn.primary {
+  background: linear-gradient(135deg, #4A90D9, #7AB3ED);
+  color: white;
+  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+}
+
+.summary-btn.secondary {
+  background: #f5f5f5;
+  color: #666;
+}
+
+/* ==================== V2.3 渐进式错误提示 ==================== */
+.progressive-hint {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx 32rpx;
+  border-radius: 32rpx;
+  margin-top: 24rpx;
+  animation: feedbackSlide 0.35s ease-out;
+}
+
+.progressive-hint.hint-level-1 {
+  background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+  border: 2rpx solid #90CAF9;
+}
+
+.progressive-hint.hint-level-2 {
+  background: linear-gradient(135deg, #FFF3CD, #FFE69C);
+  border: 2rpx solid #FFB74D;
+}
+
+.progressive-hint.hint-level-3 {
+  background: linear-gradient(135deg, #FFEBEE, #FFCDD2);
+  border: 2rpx solid #EF9A9A;
+}
+
+.progressive-hint-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.progressive-hint-text {
+  font-size: 26rpx;
+  color: #333;
+  font-weight: 500;
+  flex: 1;
+}
+
+.progressive-hint-retry {
+  font-size: 24rpx;
+  color: #4A90D9;
+  font-weight: bold;
+  flex-shrink: 0;
+  padding: 6rpx 16rpx;
+  background: rgba(74, 144, 217, 0.15);
+  border-radius: 20rpx;
+}
+
+/* ====== R-13: 每日配额用完卡片 ====== */
+.quota-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: white;
+  border-radius: 32rpx;
+  padding: 64rpx 48rpx;
+  margin: 32rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
+}
+
+.quota-emoji {
+  font-size: 96rpx;
+  margin-bottom: 16rpx;
+}
+
+.quota-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 12rpx;
+}
+
+.quota-reason {
+  font-size: 28rpx;
+  color: #999;
+  text-align: center;
+  margin-bottom: 32rpx;
+  line-height: 1.5;
+}
+
+.quota-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 40rpx;
+  padding: 24rpx 0;
+  width: 100%;
+  background: #F8FAFB;
+  border-radius: 16rpx;
+}
+
+.quota-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.quota-stat-num {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #4A90D9;
+}
+
+.quota-stat-label {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+.quota-stat-divider {
+  width: 2rpx;
+  height: 48rpx;
+  background: #E8ECF0;
+}
+
+.quota-actions {
+  display: flex;
+  gap: 24rpx;
+  width: 100%;
+}
+
+.quota-btn {
+  flex: 1;
+  text-align: center;
+  padding: 28rpx;
+  border-radius: 40rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.quota-btn.primary {
+  background: linear-gradient(135deg, #4A90D9, #7AB3ED);
+  color: white;
+}
+
+.quota-btn.secondary {
+  background: #F0F2F5;
+  color: #666;
 }

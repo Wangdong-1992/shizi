@@ -4,7 +4,8 @@ App({
     userInfo: null,
     openid: null,
     token: null,
-    fromMasteredChar: null
+    fromMasteredChar: null,
+    userAge: null   // V2.4 宝宝年龄(3-6,null 表示未设置,前端 fallback 5 岁)
   },
 
   onLaunch() {

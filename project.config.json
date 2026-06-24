@@ -32,12 +32,36 @@
         "type": "folder"
       },
       {
+        "value": "cloudfunctions",
+        "type": "folder"
+      },
+      {
         "value": "out",
         "type": "folder"
       },
       {
         "value": "shizi-docs",
         "type": "folder"
+      },
+      {
+        "value": "scripts",
+        "type": "folder"
+      },
+      {
+        "value": "docs",
+        "type": "folder"
+      },
+      {
+        "value": "deliverables",
+        "type": "folder"
+      },
+      {
+        "value": ".env.local",
+        "type": "file"
+      },
+      {
+        "value": ".env.local.example",
+        "type": "file"
       }
     ],
     "include": []
@@ -45,5 +69,6 @@
   "appid": "wxa2bbfca6b9ef6ebd",
   "editorSetting": {},
   "libVersion": "3.16.0",
-  "cloudfunctionRoot": "cloudfunctions/"
+  "cloudfunctionRoot": "cloudfunctions/",
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
 }

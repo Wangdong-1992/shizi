@@ -1,18 +1,23 @@
 <view class="container">
   <!-- 已登录状态 -->
   <block wx:if="{{isLoggedIn}}">
-    <!-- 顶部区域 -->
-    <view class="header entrance-item" wx:if="{{entranceReady}}">
+    <!-- R-14: 顶部区域 — 成长等级 + 个人信息 -->
+    <view class="header entrance-item{{entranceReady ? ' entrance-slide-up' : ''}}" wx:if="{{entranceReady}}">
       <view class="user-info">
-        <block wx:if="{{userInfo.avatarUrl}}">
-          <image class="header-avatar-img" src="{{userInfo.avatarUrl}}" mode="aspectFill" />
-        </block>
-        <block wx:else>
-          <view class="avatar">👶</view>
-        </block>
-        <view class="user-text">
+        <view class="user-avatar">
+          <text class="avatar-icon">{{growthLevel.icon}}</text>
+          <text class="avatar-level">{{growthLevel.label}}</text>
+        </view>
+        <view class="user-meta">
           <text class="greeting">{{greetingText}}</text>
           <text class="nickname">{{userInfo.nickname || '小朋友'}}</text>
+          <view class="growth-row">
+            <view class="growth-bar">
+              <view class="growth-bar-fill" style="width: {{growthLevel.progress}}%"></view>
+            </view>
+            <text class="growth-bar-text" wx:if="{{growthLevel.next}}">距{{growthLevel.next}}字</text>
+            <text class="growth-bar-text" wx:else>已达满级 ✨</text>
+          </view>
         </view>
       </view>
     </view>
@@ -36,6 +41,32 @@
       </view>
     </view>
 
+    <!-- R-14: 今日进度 + 个人最佳 -->
+    <view class="progress-section entrance-item{{entranceReady ? ' entrance-slide-up' : ''}}">
+      <view class="section-row">
+        <view class="section-half">
+          <text class="section-mini-title">📅 今日进度</text>
+          <view class="mini-progress-bar">
+            <view class="mini-progress-fill" style="width: {{todayProgress.dailyNewLimit > 0 ? (todayProgress.newLearned / todayProgress.dailyNewLimit * 100) : 0}}%"></view>
+          </view>
+          <text class="mini-progress-text">新字 {{todayProgress.newLearned}}/{{todayProgress.dailyNewLimit}}</text>
+        </view>
+        <view class="section-half">
+          <text class="section-mini-title">⭐ 个人最佳</text>
+          <view class="best-row">
+            <view class="best-item">
+              <text class="best-num">{{personalBest.maxCombo}}</text>
+              <text class="best-label">最高连击</text>
+            </view>
+            <view class="best-item">
+              <text class="best-num">{{personalBest.totalLearnDays}}</text>
+              <text class="best-label">学习天数</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- V2.2: 今日待复习入口卡片 -->
     <view class="review-card entrance-item{{entranceReady ? ' entrance-slide-up review-card-anim' : ''}}" bindtap="startReview" wx:if="{{pendingReviewCount > 0}}">
       <view class="review-card-inner">
@@ -45,6 +76,14 @@
           <text class="review-card-desc">有 {{pendingReviewCount}} 个字需要巩固复习</text>
         </view>
         <text class="review-card-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 分享成就卡片 -->
+    <view class="share-card-area entrance-item{{entranceReady ? ' entrance-slide-up' : ''}}">
+      <view class="share-card-btn" bindtap="onShareTap">
+        <text class="share-card-icon">📤</text>
+        <text class="share-card-text">分享我的学习成就</text>
       </view>
     </view>
 
@@ -141,6 +180,9 @@
       </view>
     </view>
   </block>
+
+  <!-- R-15: 分享卡片隐藏 Canvas -->
+  <canvas type="2d" id="shareCardCanvas" class="share-card-canvas"></canvas>
 
   <!-- 加载状态 -->
   <view wx:if="{{loading}}" class="loading-mask">

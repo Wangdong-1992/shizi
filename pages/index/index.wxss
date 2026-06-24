@@ -4,7 +4,7 @@ page {
 }
 
 .container {
-  padding: 32rpx;
+  padding: 24rpx 32rpx;
   padding-bottom: 140rpx;
 }
 
@@ -19,45 +19,95 @@ page {
 
 /* ====== 顶部区域 ====== */
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 32rpx;
+  margin: 0 0 24rpx;
 }
 
 .user-info {
+  background: white;
+  border-radius: 32rpx;
+  padding: 24rpx;
   display: flex;
   align-items: center;
-  gap: 24rpx;
+  gap: 20rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
 }
 
-.avatar {
-  width: 112rpx;
-  height: 112rpx;
+.user-avatar {
+  width: 96rpx;
+  height: 96rpx;
   border-radius: 50%;
   background: linear-gradient(135deg, #FFD93D 0%, #FF9F43 100%);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 60rpx;
-  box-shadow: 0 8rpx 24rpx rgba(255, 159, 67, 0.4);
-  border: 6rpx solid white;
+  flex-shrink: 0;
+  box-shadow: 0 4rpx 12rpx rgba(255, 159, 67, 0.35);
+  border: 4rpx solid #FFF8E7;
 }
 
-.user-text {
+.avatar-icon {
+  font-size: 48rpx;
+  line-height: 1;
+}
+
+.avatar-level {
+  font-size: 16rpx;
+  color: white;
+  font-weight: 600;
+  margin-top: 2rpx;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+  line-height: 1;
+}
+
+.user-meta {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 6rpx;
+  min-width: 0;
 }
 
 .greeting {
-  font-size: 28rpx;
-  color: #666;
+  font-size: 24rpx;
+  color: #999;
+  line-height: 1.2;
 }
 
 .nickname {
-  font-size: 40rpx;
+  font-size: 36rpx;
   font-weight: bold;
   color: #333;
+  line-height: 1.2;
+}
+
+.growth-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 4rpx;
+}
+
+.growth-bar {
+  flex: 1;
+  height: 8rpx;
+  background: #E8ECF0;
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+
+.growth-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4A90D9, #7AB3ED);
+  border-radius: 4rpx;
+  transition: width 0.8s ease;
+}
+
+.growth-bar-text {
+  font-size: 20rpx;
+  color: #999;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ====== 统计卡片 ====== */
@@ -67,7 +117,7 @@ page {
   padding: 32rpx;
   display: flex;
   justify-content: space-around;
-  margin-bottom: 32rpx;
+  margin-bottom: 24rpx;
   box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.1);
 }
 
@@ -118,10 +168,6 @@ page {
 }
 
 /* ====== V2.2 今日待复习卡片 ====== */
-.review-card {
-  margin-bottom: 24rpx;
-}
-
 .review-card-anim {
   animation-delay: 0.28s;
 }
@@ -176,13 +222,60 @@ page {
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* ====== R-15: 分享成就卡片 ====== */
+.review-card {
+  margin-bottom: 24rpx;
+}
+
+.share-card-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 32rpx;
+  padding: 28rpx 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  box-shadow: 0 8rpx 32rpx rgba(102, 126, 234, 0.35);
+  transition: transform 0.15s;
+}
+
+.share-card-btn:active {
+  transform: scale(0.97);
+}
+
+.share-card-icon {
+  font-size: 48rpx;
+  flex-shrink: 0;
+}
+
+.share-card-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: white;
+}
+
+.share-card-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 600px;
+  height: 480px;
+}
+
 /* ====== 操作区域 ====== */
-.actions {
-  margin-bottom: 32rpx;
+.progress-section {
+  margin: 0 8rpx 24rpx;
+  background: white;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
 }
 
 .actions-anim {
   animation-delay: 0.4s;
+}
+
+.actions {
+  margin-bottom: 24rpx;
 }
 
 .section-title {
@@ -595,4 +688,73 @@ page {
 @keyframes achievementPop {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.05); }
+}
+
+/* ====== R-14: 每日进度 + 个人最佳 ====== */
+.share-card-area {
+  margin-bottom: 24rpx;
+}
+
+.section-row {
+  display: flex;
+  gap: 24rpx;
+}
+
+.section-half {
+  flex: 1;
+}
+
+.section-mini-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 12rpx;
+  display: block;
+}
+
+.mini-progress-bar {
+  height: 10rpx;
+  background: #E8ECF0;
+  border-radius: 5rpx;
+  overflow: hidden;
+  margin-bottom: 8rpx;
+}
+
+.mini-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B35, #FFA06B);
+  border-radius: 5rpx;
+  transition: width 0.8s ease;
+}
+
+.mini-progress-text {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.best-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.best-item {
+  flex: 1;
+  text-align: center;
+  background: #F8FAFB;
+  border-radius: 12rpx;
+  padding: 16rpx 8rpx;
+}
+
+.best-num {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #4A90D9;
+  display: block;
+}
+
+.best-label {
+  font-size: 20rpx;
+  color: #999;
+  margin-top: 2rpx;
+  display: block;
 }

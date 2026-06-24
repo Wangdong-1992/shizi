@@ -207,3 +207,39 @@ page {
   transform: scale(0.8);
   margin-left: -8rpx;
 }
+
+/* ====== V2.4 宝宝年龄选择 ====== */
+.popup-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #999;
+  text-align: center;
+  margin-top: -8rpx;
+  margin-bottom: 24rpx;
+}
+
+.age-picker {
+  width: 100%;
+  margin: 24rpx 0 40rpx;
+}
+
+.age-picker-display {
+  height: 80rpx;
+  background: #F5F7FA;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+}
+
+.age-picker-text {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #4A90D9;
+}
+
+.age-picker-arrow {
+  font-size: 24rpx;
+  color: #4A90D9;
+}
