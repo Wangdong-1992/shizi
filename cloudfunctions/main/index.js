@@ -517,6 +517,30 @@ exports.main = async (event, context) => {
     const db = cloud.database();
     const _ = db.command;
 
+    // ============================================================
+    // 鉴权 (B1): 非 wxLogin action 必须用 wxContext 真实 openid, 防止横向越权
+    //   - 生产路径(realOpenid 存在): data.openid 必须等于 wxContext.OPENID
+    //   - 云端调试路径(realOpenid 为空): 必须 devMode=true 且 openid 在环境变量白名单
+    // ============================================================
+    const wxContext = cloud.getWXContext();
+    const realOpenid = wxContext.OPENID;
+    if (action !== 'wxLogin') {
+      const DEV_OPENIDS = (process.env.DEV_OPENIDS || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (!realOpenid) {
+        // 云端调试: 无登录态, devMode + 白名单才放行
+        if (!data.devMode || DEV_OPENIDS.indexOf(String(data.openid || '')) === -1) {
+          return { success: false, error: '鉴权失败: 需登录态或 devMode 白名单' };
+        }
+        console.warn('[devMode]', action, data.openid);
+      } else if (String(data.openid || '') !== String(realOpenid)) {
+        // 生产: 客户端传的 openid 与 wxContext 不一致 → 拒
+        return { success: false, error: '鉴权失败: openid 不匹配' };
+      } else {
+        // 强制对齐, 下游 case 用 data.openid 即可
+        data.openid = realOpenid;
+      }
+    }
+
     switch (action) {
       case 'wxLogin': {
         const { code, nickname, avatar } = data;
@@ -569,7 +593,7 @@ exports.main = async (event, context) => {
           });
         }
 
-        console.log('wxLogin success, openid:', openid, 'token:', token);
+        console.log('wxLogin success, openid:', openid);
         return { success: true, token, openid };
       }
 
@@ -696,7 +720,14 @@ exports.main = async (event, context) => {
         }
 
         const user = userRes.data[0];
-        const masteredIds = (user.mastered_chars || []).map(id => String(id));
+        // B7: 改用 learning_progress 查"已掌握", 避免 V2.3 后新学字 mastered_chars=[] 仍被当新字
+        //   之前用 users.mastered_chars, 新数据走 learning_progress 后该数组永远空, getNextChar 会推已学字
+        const progressRes = await db.collection('learning_progress')
+          .where({ openid: openid, status: _.in(['familiar', 'mastered', 'solid']) })
+          .field({ char_id: true })
+          .limit(2256)
+          .get();
+        const masteredIds = (progressRes.data || []).map(p => String(p.char_id));
 
         // 获取所有汉字，在内存中过滤（避免 nin 查询的类型问题）
         const charsRes = await db.collection('characters').limit(2256).get();
@@ -854,7 +885,9 @@ exports.main = async (event, context) => {
           }
         } catch (progressErr) {
           console.error('recordLearn: learning_progress 同步失败:', progressErr.message);
-          // 不阻塞主流程
+          // B5: 抛出去由外层 catch 返回 success: false, 前端可感知.
+          // 否则字被记"已掌握"但永远不进复习队列, 用户进度卡死且无任何提示.
+          throw new Error('learning_progress 同步失败: ' + progressErr.message);
         }
 
         return { success: true, rewards, mastered: true };
@@ -1068,8 +1101,31 @@ exports.main = async (event, context) => {
       case 'getAchievements': {
         const { openid } = data;
         const userRes = await db.collection('users').where({ openid }).get();
-        // Node 12 不支持可选链 ?. —— 用传统 && 写法(node 14+ 可改回 ?.)
-        const masteredCount = (userRes.data[0] && userRes.data[0].mastered_chars && userRes.data[0].mastered_chars.length) || 0;
+
+        // B8: 改用 learning_progress 算 masteredCount, 与 getStats 保持一致 (V2.3 修复遗漏)
+        //   之前读 users.mastered_chars, V2.1 假阳性期推入的字仍被算成"已掌握",
+        //   成就页进度条/解锁状态都会基于假数据.
+        var masteredCount = 0;
+        try {
+          var masteredProgressRes = await db.collection('learning_progress')
+            .where({
+              openid: openid,
+              status: _.in(['familiar', 'mastered', 'solid'])
+            })
+            .limit(1000)
+            .get();
+          var uniqueCharIds = new Set();
+          for (var ai = 0; ai < (masteredProgressRes.data || []).length; ai++) {
+            var cid = String(masteredProgressRes.data[ai].char_id || '');
+            if (cid) uniqueCharIds.add(cid);
+          }
+          masteredCount = uniqueCharIds.size;
+        } catch (e) {
+          console.error('getAchievements: learning_progress 查询失败,降级到 mastered_chars:', e.message);
+          const user0 = userRes.data[0];
+          const masteredIds = user0 ? [...new Set((user0.mastered_chars || []).map(id => String(id)))] : [];
+          masteredCount = masteredIds.length;
+        }
 
         const unlockedRes = await db.collection('achievement_log')
           .where({ openid })
@@ -1565,8 +1621,10 @@ exports.main = async (event, context) => {
           };
         } catch (err) {
           console.error('recordReview progress error:', err.message);
-          // 即使进度更新失败，也返回成功（日志已写入）
-          return { success: true, progressError: err.message };
+          // B6: 进度更新失败时返回 success: false, 让前端可感知.
+          // 之前返 success: true 是静默失败, review_logs 已写入但 Leitner Box 未更新,
+          // 下次还按原 box 推出, 用户一直打同一难度等级的字.
+          return { success: false, error: 'progress 更新失败: ' + err.message, progressError: err.message };
         }
       }
 
@@ -1698,7 +1756,9 @@ exports.main = async (event, context) => {
           });
           if (result.errcode === 0 && result.phone_info) {
             const phoneNumber = result.phone_info.phoneNumber;
-            console.log('getPhoneNumber success:', phoneNumber);
+            // 日志脱敏: 前 3 + **** + 后 4,避免手机号明文落云函数日志
+            const maskedPhone = phoneNumber ? (phoneNumber.slice(0, 3) + '****' + phoneNumber.slice(-4)) : '';
+            console.log('getPhoneNumber success:', maskedPhone);
             return { success: true, phoneNumber };
           } else {
             console.error('getPhoneNumber failed:', result);
