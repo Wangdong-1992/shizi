@@ -519,20 +519,22 @@ exports.main = async (event, context) => {
 
     // ============================================================
     // 鉴权 (B1): 非 wxLogin action 必须用 wxContext 真实 openid, 防止横向越权
-    //   - 生产路径(realOpenid 存在): data.openid 必须等于 wxContext.OPENID
-    //   - 云端调试路径(realOpenid 为空): 必须 devMode=true 且 openid 在环境变量白名单
+    //   - devMode=true: 走 DEV_OPENIDS 白名单, 不校验 wxContext (dev tools 必备)
+    //   - 生产路径(realOpenid 存在, 无 devMode): data.openid 必须等于 wxContext.OPENID
+    //   - 云端调试路径(realOpenid 为空, 无 devMode): 拒
     // ============================================================
     const wxContext = cloud.getWXContext();
     const realOpenid = wxContext.OPENID;
     if (action !== 'wxLogin') {
       const DEV_OPENIDS = (process.env.DEV_OPENIDS || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-      if (!realOpenid) {
-        // 云端调试: 无登录态, devMode + 白名单才放行
-        if (!data.devMode || DEV_OPENIDS.indexOf(String(data.openid || '')) === -1) {
-          return { success: false, error: '鉴权失败: 需登录态或 devMode 白名单' };
+      if (data.devMode) {
+        // devMode: 走白名单, 不校验 wxContext (WeChat DevTools 的 wxContext.OPENID
+        //   与 login 返回的 openid 不一致, 这是 DevTools 的特性, 不是 bug)
+        if (DEV_OPENIDS.indexOf(String(data.openid || '')) === -1) {
+          return { success: false, error: '鉴权失败: devMode 未授权' };
         }
         console.warn('[devMode]', action, data.openid);
-      } else if (String(data.openid || '') !== String(realOpenid)) {
+      } else if (!realOpenid || String(data.openid || '') !== String(realOpenid)) {
         // 生产: 客户端传的 openid 与 wxContext 不一致 → 拒
         return { success: false, error: '鉴权失败: openid 不匹配' };
       } else {

@@ -24,7 +24,16 @@ App({
       //   WeChat DevTools 里 wxContext.OPENID 与 login 返回的 openid 不一致,
       //   走 B1 鉴权的 devMode + DEV_OPENIDS 白名单分支, 避免 4 个首页云函数全失败.
       //   生产 (envVersion='release') 不注入, 严格 openid 匹配不变.
-      if (typeof __wxConfig !== 'undefined' && __wxConfig.envVersion === 'develop') {
+      var isDev = false;
+      try {
+        if (wx.getAccountInfoSync) {
+          isDev = wx.getAccountInfoSync().miniProgram.envVersion === 'develop';
+        }
+      } catch (e) {}
+      if (!isDev && typeof __wxConfig !== 'undefined' && __wxConfig.envVersion) {
+        isDev = __wxConfig.envVersion === 'develop';
+      }
+      if (isDev) {
         var originalCallFunction = wx.cloud.callFunction.bind(wx.cloud);
         wx.cloud.callFunction = function (options) {
           if (options && options.name === 'main' && options.data && options.data.data) {
