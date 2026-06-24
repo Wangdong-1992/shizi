@@ -449,11 +449,21 @@ Page({
         for (var j = 0; j < options.length; j++) {
           if (String(options[j].id) === String(selectedId)) { selOpt = options[j]; break; }
         }
-        var clM = ErrClassifier.classifyError(self.data.currentChar, self.data.currentPinyin, '', '');
+        // B10: classifyError 第三/四参原本是空串, 错因分类永远 unknown.
+        //   传 selOpt.char / selOpt.pinyin 让形近/音近分类生效.
+        var clM = ErrClassifier.classifyError(
+          self.data.currentChar,
+          self.data.currentPinyin,
+          selOpt ? (selOpt.text || selOpt.char || '') : '',
+          selOpt ? (selOpt.pinyin || '') : ''
+        );
         self.setData({ answered: true });
         self.recordReviewResult(self.data.currentCharId, false, false, null, 'meaning', clM.errorType);
         self.updateCombo(false);
-        var fbM = '正确答案：' + self.data.currentChar + ' — ' + (selOpt ? '' : '');
+        // B10: 原文 `(selOpt ? '' : '')` 是无效三元, 反馈卡末尾出现孤立破折号.
+        //   改为: 如果有选错项, 把用户选的干扰项内容拼出来辅助错因归因.
+        var wrongSuffix = selOpt ? ('（你选了: ' + (selOpt.text || selOpt.char || '') + '）') : '';
+        var fbM = '正确答案:' + self.data.currentChar + wrongSuffix;
         self.showFeedback('error', '❌', fbM + ErrClassifier.getReinforcementHint(clM.errorType, clM.similarChar));
         setTimeout(function() { self.nextQuestion(); }, 2200);
       } else {
@@ -824,7 +834,8 @@ Page({
   handleAsrFailure: function(reason) {
     var self = this;
     console.log('ASR失败，降级为选择题, 原因:', reason);
-    self.setData({ fallbackReason: reason });
+    // B11: ASR 失败时把 asrProcessing / recording 回滚, 否则 WXML 转圈"正在识别..." 永远显示
+    self.setData({ fallbackReason: reason, asrProcessing: false, recording: false });
 
     // 调用getOptions获取选择题选项
     wx.cloud.callFunction({

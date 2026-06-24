@@ -948,7 +948,10 @@ Page({
         );
 
         var stepResults3 = self.data.stepResults.slice();
-        stepResults3[3] = {
+        // B9: V2.5.1 删描红(原 Step3)后残留, 应写 [2](Step4 跟读), 不是 [3]
+        //   submitLearnResult 遍历 i<3 检查 stepCompleted[i], 写 [3] 永远读不到,
+        //   该字 recordLearn 不调用, mastered 永远不增.
+        stepResults3[2] = {
           completed: true,
           correct: false,
           isAssisted: true,
@@ -960,7 +963,7 @@ Page({
         };
 
         var stepCompleted3 = self.data.stepCompleted.slice();
-        stepCompleted3[3] = true;
+        stepCompleted3[2] = true;
 
         self.setData({
           showChoiceMode: false,

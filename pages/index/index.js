@@ -231,6 +231,10 @@ Page({
   // ========== 加载首页数据 ==========
   loadIndexData: async function() {
     var self = this;
+    // B12: 防 onShow 重复触发. 用户在 review/learn 页停留后切回首页,
+    //   onShow → checkLoginStatus → loadIndexData, 第一次还在 await 时第二次又触发,
+    //   两组 Promise.all 竞争 setData 导致数字跳动 / entranceReady 闪烁.
+    if (self.data.loading) return;
     self.setData({ loading: true, entranceReady: false });
 
     try {
