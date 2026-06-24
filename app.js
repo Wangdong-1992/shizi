@@ -19,6 +19,22 @@ App({
         traceUser: true
       });
       console.log('cloud init done');
+
+      // dev tools: 自动给所有 main 云函数调用加 devMode=true.
+      //   WeChat DevTools 里 wxContext.OPENID 与 login 返回的 openid 不一致,
+      //   走 B1 鉴权的 devMode + DEV_OPENIDS 白名单分支, 避免 4 个首页云函数全失败.
+      //   生产 (envVersion='release') 不注入, 严格 openid 匹配不变.
+      if (typeof __wxConfig !== 'undefined' && __wxConfig.envVersion === 'develop') {
+        var originalCallFunction = wx.cloud.callFunction.bind(wx.cloud);
+        wx.cloud.callFunction = function (options) {
+          if (options && options.name === 'main' && options.data && options.data.data) {
+            // 用 Object.assign 创建新对象, 不污染调用方的 data 引用
+            options.data.data = Object.assign({}, options.data.data, { devMode: true });
+          }
+          return originalCallFunction(options);
+        };
+        console.log('[devMode] 自动注入 devMode=true for main 云函数');
+      }
     }
     // 不在这里获取openid，改为按需获取
   },
