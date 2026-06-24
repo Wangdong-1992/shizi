@@ -251,10 +251,15 @@ Page({
         if (res.result && res.result.success && res.result.data) {
           var optionsData = res.result.data.options || [];
           self.setData({ options: optionsData });
+        } else {
+          // success:false (业务失败/B1鉴权失败等) 之前完全静默, 用户看不到选项也不知道为啥
+          console.error('getOptions 业务失败:', res.result && res.result.error);
+          wx.showToast({ title: '加载选项失败,请重试', icon: 'none' });
         }
       },
       fail: function(err) {
         console.error('获取选项失败:', err);
+        wx.showToast({ title: '网络异常,请重试', icon: 'none' });
       }
     });
   },
