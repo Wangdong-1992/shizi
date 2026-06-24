@@ -579,7 +579,7 @@ function getReinforcementHint(errorType, similarChar) {
     case 'sound_similar':
       return '读音混淆 — 建议多听发音，注意声调区别';
     case 'stroke':
-      return '笔顺错误 — 建议多练习描红，熟悉笔画顺序';
+      return '笔画顺序有误 — 建议跟老师学写,记住笔顺规则';
     default:
       return '建议多复习几次，加深印象';
   }

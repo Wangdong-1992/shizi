@@ -4,6 +4,8 @@
 >
 > 本文档记录 V2.3 → V2.4 的设计变更。**V2.4 聚焦"描红体验"的字形贴合度**——底字和引导线来自同源数据,实现 100% 视觉对齐。
 
+> ⚠️ **V2.5.1 已删除描红功能(Step3),本文档仅作历史参考**。V2.4 的全部设计(SVG path 同源、系统楷体 fallback、按年龄容差 DTW 评分)随描红功能移除而废弃。
+
 ---
 
 ## 0. 调研背景
@@ -127,7 +129,7 @@ setData strokePaths (medians) + drawStrokeGuide
 **关键代码路径:**
 
 `loadStrokeData(char)` 异步函数:
-1. 查 `wx.getStorageSync('stroke_<字>')` 本地缓存
+1. 查 `wx.getStorageSync('stroke_v2_<字>')` 本地缓存(带版本号,数据格式变更时老缓存自动失效)
 2. 缓存命中且含 svgPath → 直接返回
 3. 缓存未命中 → `wx.cloud.callFunction({name: 'main', data: {action: 'getStrokeData', data: {char}}})`
 4. 拉到数据 → `wx.setStorageSync` 写回缓存
@@ -199,8 +201,8 @@ case 'getStrokeData': {
 ### 待完成
 - [ ] 用户端到端验收(描红页 + 缓存 + fallback)
 - [ ] **commit + push V2.4 改动**(V2.4 阶段 2 未提交)
-- [ ] DTW 评分(方案 B Step 3 锦上添花)
-- [ ] 容错率分龄(参考洪恩经验)
+- [x] ~~DTW 评分(方案 B Step 3 锦上添花)~~ — **V2.5 已用 hanzi-writer 4-check 重做,见 `docs/CLAUDE.md` 描红评分升级章节 + `utils/stroke-grader.js`**
+- [x] ~~容错率分龄(参考洪恩经验)~~ — **V2.5 已在 stroke-grader 实现:年龄 → leniency 映射(3岁 2.0 / 6岁 1.0)**
 
 ## 7. 相关文件
 

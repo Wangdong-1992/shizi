@@ -2,19 +2,20 @@
 
 面向 3-6 岁幼儿园儿童的汉字学习微信小程序，核心目标教会 2256 个常用汉字。
 
-**当前版本：V2.4 — 描红字形贴合优化（异步加载架构 + 系统楷体 fallback）**
+**当前版本：V2.5.1 — 删除描红功能（学习页改为三步流程：释义→再认→跟读）**
 
 ## 功能
 
-- **学习页**：四步递进学习（释义→再认→描红→跟读），Leitner Box 间隔重复，笔顺描红引导
+- **学习页**：三步递进学习（释义→再认→跟读），Leitner Box 间隔重复
 - **复习页**：听音选字 / 看字说音双模式，间隔重复调度，Box 升降反馈
 - **首页**：时段问候 + 数字滚动动画 + 成就徽章脉冲 + 学习/复习快捷入口 + 待复习数量
 - **个人中心**：头像昵称 + 数据统计 + 成就展示 + 已掌握汉字列表
 - **兴趣激励**：星星/小红花奖励 + 7级成就体系
 - **V2.0 愉悦体验**：触感震动 + 弹性入场 + 水波纹 + 星星粒子 + 烟花庆祝 + 14组关键帧动画
-- **V2.2 学习引擎**：Leitner Box (1-5级) + 五级掌握状态机 + 优先级调度 + 2256字笔顺数据
+- **V2.2 学习引擎**：Leitner Box (1-5级) + 五级掌握状态机 + 优先级调度
 - **V2.3 安全与数据修复**：密钥剥离 + learning_progress 同步 + 假阳性过滤 + 客户端 TTS 重试
-- **V2.4 描红优化**：SVG path 底字 100% 贴合（异步加载）+ 系统楷体 fallback（阶段 1）
+- **V2.4 描红优化**：SVG path 底字 100% 贴合（异步加载）+ 系统楷体 fallback（阶段 1）【V2.5.1 已删除】
+- **V2.5 描红评分重做**：hanzi-writer 4-check 算法移植 `utils/stroke-grader.js`（替换 V2.4 DTW），坐标系修正，0 第三方渲染依赖【V2.5.1 已删除】
 
 ## 技术栈
 
@@ -28,7 +29,7 @@
 ```
 ├── pages/                  # 6个页面
 │   ├── index/              # 首页
-│   ├── learn/              # 学习页（四步递进）
+│   ├── learn/              # 学习页（三步递进）
 │   ├── review/             # 复习页
 │   ├── profile/            # 个人中心
 │   ├── mastered/           # 已掌握列表
@@ -36,22 +37,17 @@
 ├── utils/
 │   ├── delight.js          # V2.0 愉悦引擎（震动/动画/粒子/连击/文案）
 │   ├── spaced-repetition.js # V2.2 间隔重复算法（Leitner Box + 状态机 + 优先级）
-│   ├── audio.js            # V2.3 客户端 TTS 拉取 + 自动重试
-│   └── stroke-data.js      # 笔顺路径数据（2256字，GB 13000.1规范，1.6MB 主包用）
+│   └── audio.js            # V2.3 客户端 TTS 拉取 + 自动重试
 ├── scripts/
-│   ├── convert-stroke-data.js     # 笔顺数据生成（JS 模式 → utils/stroke-data.js;JSON 模式 → 云函数 strokeCache/）
-│   ├── verify-regenerated.js      # 笔顺验证（检查生成后2256字笔顺正确性）
-│   ├── audit-stroke-order.js      # 源数据审计（检查hanzi-writer-data原始笔顺问题）
 │   ├── smoke-test.js             # 云函数冒烟测试（粘贴到 IDE Console 跑）
 │   └── smoke-test-ui.md          # UI 测试清单
 ├── cloudfunctions/
 │   ├── login/              # 微信登录（获取 openid）
-│   ├── main/               # 主业务逻辑（23 个 action）
-│   │   └── strokeCache/    # V2.4: 2256 个笔顺数据 JSON（每字 1-3KB,含 svgPath,4.5MB 总）
+│   ├── main/               # 主业务逻辑（22 个 action）
 │   ├── fixData/            # 数据修复
 │   └── import_chardata/    # 汉字数据导入
 ├── docs/                   # 产品文档
-│   └── 描红功能调研_横纵分析报告.md  # 调研报告（仅在根目录有一份，PDF 在根目录同名 .pdf）
+│   └── archive/            # 历史文档归档（含 V2.4 描红调研报告）
 └── images/                 # TabBar 图标
 ```
 
@@ -82,7 +78,9 @@
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| V2.4 | 2026-06-02 | 描红字形贴合：SVG path 底字（异步加载架构）+ 系统楷体 fallback（阶段 1） |
+| V2.5.1 | 2026-06-24 | 删除描红功能（Step3），学习页改为三步流程（释义→再认→跟读），按 PRD 保留 Step4 内部编号 |
+| V2.5 | 2026-06-09 | 描红评分重做：hanzi-writer 4-check 算法移植 + 坐标系修正 + 0 第三方渲染依赖（已被 V2.5.1 删除） |
+| V2.4 | 2026-06-02 | 描红字形贴合：SVG path 底字（异步加载架构）+ 系统楷体 fallback（阶段 1）（已被 V2.5.1 删除） |
 | V2.3 | 2026-06-01 | 密钥剥离 + learning_progress 同步 + 假阳性过滤 + 客户端 TTS 重试 |
 | V2.2 | 2026-05-29 | 间隔重复引擎 + 四步递进学习 + 笔顺描红 |
 | V2.1 | 2026-05-29 | ASR降级选择题 + Math.random()假阳性消除 |
@@ -93,4 +91,5 @@
 | V1.0.0 | 2026-05-14 | 初始版本 |
 
 完整 V2.3 系统设计见 [docs/system_design_v23.md](docs/system_design_v23.md)
-完整 V2.4 系统设计见 [docs/system_design_v24.md](docs/system_design_v24.md)
+完整 V2.5.1 产品需求见 [docs/儿童识字应用_PRD_V2.5.0.md](docs/儿童识字应用_PRD_V2.5.0.md)
+V2.4 描红设计文档归档于 [docs/system_design_v24.md](docs/system_design_v24.md)（V2.5.1 已废弃描红功能，仅作历史参考）

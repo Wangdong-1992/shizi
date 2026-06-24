@@ -44,10 +44,6 @@
         "type": "folder"
       },
       {
-        "value": "utils/stroke-data.js",
-        "type": "file"
-      },
-      {
         "value": "scripts",
         "type": "folder"
       },
@@ -58,10 +54,6 @@
       {
         "value": "deliverables",
         "type": "folder"
-      },
-      {
-        "value": "描红功能调研_横纵分析报告.*",
-        "type": "regex"
       },
       {
         "value": ".env.local",

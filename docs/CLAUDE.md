@@ -16,7 +16,7 @@
 ```
 E:/claude/PMRD/shizi/
 ├── docs/                              # 产品文档
-│   ├── 儿童识字应用_PRD_V2.0.0.md      # 产品需求文档
+│   ├── 儿童识字应用_PRD_V2.5.0.md      # 产品需求文档（当前版本）
 │   ├── 一级字表_拼音.xlsx              # 2256字原始数据
 │   └── CLAUDE.md                      # 本文件（项目约定）
 ├── pages/                             # 页面目录
@@ -27,18 +27,18 @@ E:/claude/PMRD/shizi/
 │   ├── mastered/                      # 已掌握汉字列表
 │   └── settings/                      # 设置页
 ├── scripts/
-│   ├── convert-stroke-data.js          # 笔顺数据生成（hanzi-writer-data + cnchar校准）
-│   ├── verify-regenerated.js           # 笔顺验证（检查生成后2256字笔顺正确性）
-│   └── audit-stroke-order.js           # 源数据审计（检查hanzi-writer-data原始笔顺问题）
+│   └── smoke-test.js                  # 冒烟测试
 ├── utils/
 │   ├── delight.js                      # V2.0 愉悦体验引擎
 │   ├── spaced-repetition.js            # V2.2 间隔重复算法模块
-│   └── stroke-data.js                  # 笔顺路径数据（2256字）
+│   ├── audio.js                        # V2.3 TTS自动重试
+│   ├── progressive-hint.js             # V2.3 渐进提示
+│   └── error-classifier.js            # V2.3 错因分类
 ├── cloudfunctions/                    # 云函数
 │   ├── login/                         # 获取openid
-│   ├── main/                          # 主业务逻辑（14个action）
+│   ├── main/                          # 主业务逻辑（22个action，V2.5.1起无描红）
 │   ├── fixData/                       # 数据修复
-│   └── import_chardata/               # 汉字数据导入
+│   └── import_chardata/             # 汉字数据导入
 ├── images/                            # TabBar图标
 ├── app.js                             # 应用入口
 ├── app.json                           # 全局配置
@@ -135,7 +135,6 @@ E:/claude/PMRD/shizi/
 | `cleanReviewLogs` | R-16 清洗 V2.1 之前的假阳性 review_logs（打 `data_quality="unreliable_pre_fix"` 标签） | { cutoffDate, dryRun, batchSize } |
 | `sendReviewReminder` | 定时器触发，订阅用户推送复习提醒 | （定时器或手动） |
 | `resetUserData` | **V2.3 危险操作**：清空当前用户所有学习数据。生产路径用 `{ confirm: true }`（用 wxContext.OPENID 锁定）；云端调试需 `{ devMode: true, openid, confirm: true }` | { confirm, devMode?, openid? } |
-| `getStrokeData` | **V2.4 阶段 2**：返回单字笔顺数据（points + direction + svgPath）。前端异步加载底字用。单字查：`{ char: "住" }`；批量查：`{ char: "住\|任\|主" }`（用 \| 分隔，返回 hit/miss/data） | { char } |
 
 ## V2.0 愉悦体验引擎 (utils/delight.js)
 
@@ -185,7 +184,6 @@ this.setData(Object.assign({
 **它重置的字段**（25+ 个，统一收口，未来新增"切字时需要清零"的字段只在这里加一次）：
 - 四步状态机本体：`currentStep / stepCompleted / stepResults / learnCompleted / finalResult / feedbackShow`
 - Step2 再认：`step2Options / step2Answered / step2Correct / step2SelectedId`
-- Step3 描红：`strokePaths / strokeIndex / strokeCompleted / hasStrokeData / totalStrokes / strokeDeviation`
 - Step4 跟读：`step4Correct / step4Answered / asrFailed / asrProcessing / showChoiceMode / choiceOptions`
 - V2.3 渐进提示：`charErrorCount / showProgressiveHint / progressiveHintText / progressiveHintLevel`
 - R-13 每日配额：`dailyQuotaReached / dailyQuotaReason`
@@ -193,129 +191,6 @@ this.setData(Object.assign({
 **为什么需要它：** 修复 V2.2 上线后"上一个字学完直接进入下一个字时残留 learnCompleted=true"导致的"学会了"弹窗 bug（V2.3 修复 1）。
 
 ## V2.4 新增工具
-
-### 描红字形贴合架构（V2.4 阶段 1 + 阶段 2）
-
-**问题：** 原版描红底字用系统 `sans-serif` 字体渲染，跟 `stroke-data.js` 用的 Arphic 楷体（Make Me a Hanzi 数据源）字形不一致 → "底字字形"和"虚线引导"对不上，儿童描红时方向/位置偏差明显。此外，原始 1024×1024 坐标系 46.6% 字符 Y 为负值，简单缩放导致底字被 canvas `overflow:hidden` 裁切。
-
-**V2.4 阶段 1（已上线）：** 切换到系统楷体
-- `pages/learn/learn.js` 底字字体从 `'140px sans-serif'` 改为 `'140px "Kaiti", "STKaiti", "楷体", serif'`
-- 改善但有上限：系统楷体各家略有差异，**无法 100% 贴合** Arphic 楷体
-- 字号 `140px` 保留 V2.3 修复值（预留 15% 边距避免贴框）
-
-**V2.4 阶段 2（已实现，待用户验收）：** 用 SVG path 渲染底字
-- 数据：2256 个 JSON 拆到 `cloudfunctions/main/strokeCache/<字>.json`（每字 1-3KB，含 `svgPath`）
-- 主包 `utils/stroke-data.js` 保持 1.6MB（无 svgPath）以装下 2MB 限制
-- `pages/learn/learn.js` 加 `loadStrokeData(char)` 和 `preloadStrokeData(chars)` 异步函数
-- `initStep3` 流程：先用本地 medians 显示（无白屏）→ 异步拉云函数 strokeCache 升级 strokePaths → 拉到失败 fallback 同步数据
-- 关键代码路径：`loadStrokeData` 查 `wx.getStorageSync` 本地缓存 → 缓存未命中调 `wx.cloud.callFunction` → 拉到的数据 `wx.setStorageSync` 写回缓存
-
-**Canvas 坐标系修复（2026-06-03）：**
-- 微信 `400rpx` CSS 尺寸在不同设备上 ≠ `200px`（如某设备 dpr=3 时实际 207.258px）
-- `drawStrokeGuide` 改为固定 200×200 逻辑坐标系：`canvas.width = 200 * dpr`、`canvas.height = 200 * dpr`、`ctx.scale(dpr, dpr)`
-- `scaleX = scaleY = 1`（不做 CSS像素→逻辑坐标换算），所有渲染坐标基于 200×200
-
-**SVG Path 坐标翻转：**
-- WeChat `canvas.createPath2D()` 渲染时 SVG path 显示为镜像+倒置
-- `normalizeSvgPath()` 在数据层预先翻转所有坐标：`(x, y) → (200-x, 200-y)`
-- 配合逐字归一化使底字正确居中在 200×200 画布内
-- 底字用 `ctx.fill(p, 'evenodd')` 填充（`nonzero` 在微信 canvas 不生效）
-
-**笔顺纠正增强（2026-06-03）：**
-- `classifyDirection()` 从 5 类扩展到 7 类（h/v/d/u/p/t），拆分捺(u)和点(p)
-- 新增 `reorderToGB()` 贪心匹配算法：cnchar GB 标准 × hw 笔画方向/类型/折数/空间位置 → 得分提升 >1.1× 才重排（~341 字）
-- `fixStrokeOrder()` 垂直栈检测作为回退（~952 字），共计纠正 ~1293 字
-
-**为什么拆 JSON 不放主包：** 完整 svgPath 数据约 4.5MB，超过主包 2MB 限制。`strokeCache/` 随云函数部署，**不占主包**。
-
-### 描红评分升级：DTW + 按年龄容差（V2.4 阶段 2 Day 4）
-
-**问题**：原版描红评分是"点到折线最短距离 + 固定阈值 30/35 像素"（`calcDeviation` + `calcAverageDeviation`）。3-4 岁手部精细动作弱，沿用 5-6 岁阈值会觉得"字难写,怎么写都不对",挫败感强;且点距离无法识别"反向画"和"画错形状"。
-
-**方案**：
-- 新模块 `utils/stroke-dtw.js`：标准 DTW (Dynamic Time Warping) + 预降采样 24 点（等弧长采样，576 步 DP，< 1ms）
-- 4 档年龄容差表（3 岁最宽松、6 岁最严、5 岁为默认档）
-- `users` 集合加 `age` 字段（3-6 整数，null 表示未设置）
-- 设置页加"宝宝年龄"行（picker mode="selector"），调用 `updateUserInfo` 持久化
-- learn.js 在 touchstart 缓存容差到 `self._tolerance`，touchend 用 DTW 评分替换固定阈值
-
-**算法核心**：
-| 函数 | 作用 |
-|------|------|
-| `resamplePath(points, n=24)` | 等弧长降采样到 n 个点 |
-| `euclideanDist(a, b)` | 欧氏距离 |
-| `calcDTWDistance(a, b)` | DP 表标准 DTW，归一化返回平均距离（DP/(N+M)） |
-| `scoreStroke(userPts, guidePts)` | resample + DTW + 线性映射 [0, 30] → [1, 0] |
-| `getAgeTolerance(age)` | 查 4 档表，age 不在 3-6 回退到 5 岁档 |
-
-**容差表**（按实测 DTW 距离分布校准）：
-
-| 年龄 | warn 像素 | pass 像素 | DTW 分数阈值 | 行为 |
-|------|----------|----------|------------|------|
-| 3 岁 | 50 | 45 | 0.45 | 最宽松 |
-| 4 岁 | 45 | 40 | 0.55 | 较宽松 |
-| 5 岁 | 35 | 30 | 0.70 | 默认档 |
-| 6 岁 | 30 | 25 | 0.85 | 最严 |
-
-**性能**：`1000 次 scoreStroke < 10ms`（脚本 `scripts/test-stroke-dtw.js` 测得）。touchend 1 帧（< 16ms）内完成,不卡顿。
-
-**单元测试**：`node scripts/test-stroke-dtw.js` 跑 28 项测试（覆盖算法、性能、边界值）。
-
-**默认值**：新用户 `age: null`,前端 fallback 5 岁档(不打断首次使用);老用户无 age 字段同理 fallback。
-
-### 云函数新 action：`getStrokeData`
-
-**位置：** `cloudfunctions/main/index.js` switch 末尾
-
-**作用：** 返回单字笔顺数据（points + direction + svgPath）
-
-**调用方式：**
-```js
-// 单字查
-wx.cloud.callFunction({
-  name: 'main',
-  data: { action: 'getStrokeData', data: { char: '住' } }
-})
-// → { success: true, data: { char: '住', strokes: [...] } }
-
-// 批量查（用 | 分隔）
-wx.cloud.callFunction({
-  name: 'main',
-  data: { action: 'getStrokeData', data: { char: '住|任|主' } }
-})
-// → { success: true, hit: 3, miss: 0, data: { '住': {...}, '任': {...}, '主': {...} } }
-```
-
-**注意：** 汉字文件名直接用汉字（如 `住.json`），**不要**用 `encodeURIComponent`（微信云函数 fs 对汉字文件名 UTF-8 支持 OK）。
-
-### 数据生成脚本升级：`scripts/convert-stroke-data.js`
-
-新增 CLI 模式：
-
-```bash
-# 默认 JS 模式（输出 utils/stroke-data.js,无 svgPath,1.6MB 主包用）
-node scripts/convert-stroke-data.js
-
-# JSON 模式（输出 2256 个 JSON 到 cloudfunctions/main/strokeCache/,带 svgPath,云函数本地用）
-node scripts/convert-stroke-data.js --mode=json
-```
-
-**核心算法：**
-
-| 步骤 | 函数 | 说明 |
-|------|------|------|
-| 逐字归一化 | `computeCharNormalize(medians, rawStrokes)` | 含 SVG 轮廓的包围盒 → 居中缩放至 200×200（MARGIN=10） |
-| 坐标缩放+简化 | `simplifyPoints(median, norm)` | Douglas-Peucker epsilon=16（1024空间），保留起点/终点/转折点 |
-| SVG 路径处理 | `normalizeSvgPath(svgPath, norm)` | Q/C/T→L 简化 + 逐字归一化 + `(200-x,200-y)` 翻转补偿 |
-| 方向分类 | `classifyDirection(points)` | 7 类: h/v/d/u/p/t（捺/点拆分，阈值 DOT_MAX_LEN=350） |
-| 笔顺纠正-主 | `reorderToGB(medians, strokes, char)` | cnchar GB 标准贪心匹配（方向 100 + 类型 50 + 折数 15 + 位置 20） |
-| 笔顺纠正-回退 | `fixStrokeOrder(medians, strokes, char)` | 垂直栈 Y-重叠检测翻转（xThreshold=250, overlapThreshold=0.3） |
-
-**模式差异：**
-| 模式 | 输出 | svgPath | 用途 |
-|------|------|---------|------|
-| JS（默认） | `utils/stroke-data.js` | 不输出 | 主包数据 |
-| JSON | `cloudfunctions/main/strokeCache/*.json` | 输出（翻转+归一化, toFixed 1, Q/C/T→L） | 云函数本地数据 |
 
 ## 已完成功能
 
@@ -340,7 +215,6 @@ node scripts/convert-stroke-data.js --mode=json
 - [x] 间隔重复引擎（V2.2）：utils/spaced-repetition.js + Leitner Box (1-5级) + 五级掌握状态机 + 优先级调度
 - [x] 四步递进学习页重构（V2.2）：释义→再认→描红→跟读，单页状态机
 - [x] 复习页适配（V2.2）：Box升降反馈 + 状态变迁提示 + exerciseType参数
-- [x] 笔顺数据生成（V2.2）：scripts/convert-stroke-data.js + hanzi-writer-data → cnchar校准 + Y-overlap垂直栈翻转 → 2256字完整笔顺数据(GB 13000.1)，1197字自动纠正
 - [x] 旧数据按需迁移（V2.2）：migrateProgress云函数，首页首次访问触发
 - [x] 云函数 recordReview 三写闭环：review_logs + learning_progress + 状态信息返回
 - [x] **V2.3 P0 修复**：密钥从代码中剥离，改用云函数环境变量
@@ -350,12 +224,7 @@ node scripts/convert-stroke-data.js --mode=json
 - [x] **V2.3**：云函数新增 resetUserData action（清空当前用户学习数据）
 - [x] **V2.3**：settings 页加 "清除学习数据" 按钮（带二次确认）
 - [x] **V2.3 架构优化**：pages/learn/learn.js 抽出 resetLearnStateMachine 公共方法，loadChar / checkMasteredChar 共用
-- [x] **V2.4 阶段 1**：描红底字字体改系统楷体（Kaiti / STKaiti / 楷体 fallback）+ 字号保留 V2.3 修复值 140px
-- [x] **V2.4 阶段 2 Day 1**：笔顺数据拆分到云函数 `cloudfunctions/main/strokeCache/<字>.json`（2256 个，4.5MB 总），加 `getStrokeData` 云函数 action（支持单字 + 批量）
-- [x] **V2.4 阶段 2 Day 2**：`pages/learn/learn.js` 加 `loadStrokeData` + `preloadStrokeData` 异步函数，`initStep3` 改造：先同步 medians 显示无白屏 + 异步拉 svgPath 升级 + 失败 fallback 同步数据
-- [x] **V2.4 阶段 2 Day 3**：Canvas 坐标系修复（固定 200×200 逻辑坐标，解耦 rpx→px 设备差异）+ SVG path 坐标翻转补偿 + 逐字归一化含 SVG 轮廓包围盒 + 笔顺纠正增强（7类方向 + reorderToGB 贪心匹配 + 1293字纠正）
-- [x] **V2.4 阶段 2 Day 4**：描红评分升级 DTW + 按年龄容差（`utils/stroke-dtw.js` + `users.age` 字段 + 设置页 picker + learn.js 接入；脚本 `scripts/test-stroke-dtw.js` 28 项测试全过）
-- [x] **V2.4 调研**：`描红功能调研_横纵分析报告.md`（根目录），调研主流产品（洪恩 / 有道 / 河小象 / 麦田 等）+ Hanzi Writer / Make Me a Hanzi 开源方案，输出 3 个技术选型方案
+- [x] **V2.5.1**：删除描红功能（Step3），学习页改为三步流程（释义→再认→跟读）
 
 ## 已修复Bug
 
@@ -425,6 +294,7 @@ node scripts/convert-stroke-data.js --mode=json
 8. **切字必重置**：learn / review 等页面切字时**必须**调 `resetLearnStateMachine()`（或在 review 的 `showCurrentQuestion` 写完整重置 setData），避免上一个字的状态残留
 9. **密钥不进代码**：微信 AppSecret、百度 API Key/Secret 等敏感配置**必须**用云函数环境变量（`process.env`），代码里 `if (!xxx) throw new Error` 兜底，缺变量直接 fail 不静默
 10. **主包 2MB 红线**：微信小程序主包硬限制 2MB。新增目录/批量文件前，必须判断这东西是不是该进主包——云函数代码、脚本、文档、node_modules 都不进——如果确定不进，立刻同步更新 `project.config.json` 的 `packOptions.ignore`。写完代码后跑一次「上传」看预估包大小，不要等提测才发现超限。当前排除清单见 `project.config.json` 的 `packOptions.ignore`
+11. **算法抽离优先于库强集成（V2.5 教训→V2.5.1 反转）**：V2.5 抽算法移植了 hanzi-writer 4-check 评分，V2.5.1 验证后发现：描红功能本身被删除，stroke-grader 模块随之移除。此原则仍有效（适用于有长期价值的算法），但需先确认功能是否保留再决定是否抽算法。
 
 ## 部署步骤
 

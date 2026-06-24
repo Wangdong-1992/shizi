@@ -2,13 +2,8 @@
 const cloud = require('wx-server-sdk');
 const crypto = require('crypto');
 const https = require('https');
-const fs = require('fs');
-const path = require('path');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
-
-// V2.4 阶段 2(B 方案):笔顺数据本地缓存目录
-const STROKE_CACHE_DIR = path.join(__dirname, 'strokeCache');
 
 // ============================================================
 // 密钥配置 ——
@@ -2269,50 +2264,6 @@ exports.main = async (event, context) => {
 
         console.log('resetUserData done for', targetOpenid, result);
         return { success: true, openid: targetOpenid, devMode: isDevMode, ...result };
-      }
-
-      // V2.4 阶段 2(B 方案):返回单字笔顺数据(异步加载用)
-      case 'getStrokeData': {
-        const { char } = data;
-        if (!char || typeof char !== 'string') {
-          return { success: false, error: 'char 必须是非空字符串' };
-        }
-        // 单字查 - 直接传 '一' 这种字符
-        if (char.length === 1) {
-          const filePath = path.join(STROKE_CACHE_DIR, char + '.json');
-          if (fs.existsSync(filePath)) {
-            try {
-              const content = fs.readFileSync(filePath, 'utf8');
-              const strokeData = JSON.parse(content);
-              return { success: true, data: strokeData };
-            } catch (e) {
-              console.error('getStrokeData read error:', char, e.message);
-              return { success: false, error: '读取 ' + char + ' 失败: ' + e.message };
-            }
-          }
-          return { success: false, error: '字 ' + char + ' 不在缓存中' };
-        }
-        // 批量查 - 传 '一|二|三'
-        if (char.indexOf('|') >= 0) {
-          const chars = char.split('|').filter(c => c.length === 1);
-          const result = {};
-          let hit = 0, miss = 0;
-          for (const c of chars) {
-            const filePath = path.join(STROKE_CACHE_DIR, c + '.json');
-            if (fs.existsSync(filePath)) {
-              try {
-                result[c] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                hit++;
-              } catch (e) {
-                miss++;
-              }
-            } else {
-              miss++;
-            }
-          }
-          return { success: true, hit, miss, data: result };
-        }
-        return { success: false, error: 'char 格式错误(单字或 字1|字2|... 形式)' };
       }
 
       default:
