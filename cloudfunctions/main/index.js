@@ -722,7 +722,15 @@ exports.main = async (event, context) => {
         // 随机返回一个
         if (unmastered.length > 0) {
           const randomIndex = Math.floor(Math.random() * unmastered.length);
-          return { success: true, data: unmastered[randomIndex] };
+          let chosen = unmastered[randomIndex];
+          // _id 丢失兜底:用 char 字段回查,防御 BSON 序列化丢失
+          if (!chosen._id && !chosen.id && chosen.char) {
+            const refRes = await db.collection('characters').where({ char: chosen.char }).limit(1).get();
+            if (refRes.data && refRes.data.length > 0) {
+              chosen = refRes.data[0];
+            }
+          }
+          return { success: true, data: chosen };
         }
 
         return { success: true, data: null, error: '已学完所有汉字' };
@@ -1093,6 +1101,12 @@ exports.main = async (event, context) => {
       case 'getOptions': {
         // 获取再认选项（形近字优先 + 同音字补充 + 随机填充）
         const { charId, shapeSimilar } = data;
+
+        // charId 无效直接返回错误，避免匹配到错误的字
+        if (!charId) {
+          console.error('[getOptions] charId 为空，跳过');
+          return { success: false, error: 'charId 为空' };
+        }
 
         // charId 可能是 _id 或 id，尝试用 _id 查询
         let char;
