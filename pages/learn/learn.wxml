@@ -49,7 +49,8 @@
       </view>
       <view class="step-line {{currentStep >= 4 ? 'active' : ''}}"></view>
       <view class="step-dot {{currentStep >= 4 ? 'active' : ''}} {{stepCompleted[2] ? 'completed' : ''}}">
-        <text class="step-num">4</text>
+        <!-- V2.5.1 删描红后只剩 3 步, 视觉编号 1/2/3. 内部 currentStep 仍用 4 (避免 PRD/数据库 schema 断链) -->
+        <text class="step-num">3</text>
         <text class="step-label">跟读</text>
       </view>
     </view>
