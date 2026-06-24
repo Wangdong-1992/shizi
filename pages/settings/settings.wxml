@@ -19,7 +19,7 @@
       </view>
     </view>
 
-    <!-- V2.4: 宝宝年龄(影响描红容差) -->
+    <!-- V2.4: 宝宝年龄 -->
     <view class="settings-item" bindtap="showAgeSheet">
       <text class="settings-label">宝宝年龄</text>
       <view class="settings-right">
@@ -78,7 +78,7 @@
   <view class="popup-mask" wx:if="{{agePopup.show}}" bindtap="closeAgePopup"></view>
   <view class="popup-sheet {{agePopup.show ? 'popup-show' : ''}}">
     <text class="popup-title">选择宝宝年龄</text>
-    <text class="popup-hint">影响描红容差,3-4岁更宽松、5-6岁更严</text>
+    <text class="popup-hint">宝宝年龄(3-6 岁),用于个性化学习体验</text>
     <picker
       mode="selector"
       range="{{ageRange}}"

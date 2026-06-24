@@ -66,7 +66,7 @@ test('cssArrayToLogical 批量转换', function() {
   assert.strictEqual(out[1].y, 100);
 });
 
-test('显式 logicalWidth=200 (描红 200x200 场景)', function() {
+test('显式 logicalWidth=200 (200x200 画布场景)', function() {
   var g = Geom.createGeom({ cssWidth: 200, cssHeight: 200, dpr: 1, logicalWidth: 200, logicalHeight: 200 });
   var r = g.cssToLogical({ x: 60, y: 80 });
   assert.strictEqual(r.x, 60);

@@ -52,7 +52,7 @@ Page({
         pushSubscribed: user.push_subscribed || false,
         currentAge: typeof user.age === 'number' ? user.age : null
       });
-      // 同步到 app.globalData,供 learn.js 描红容差读取
+      // 同步到 app.globalData,供后续个性化使用
       app.globalData.userAge = typeof user.age === 'number' ? user.age : null;
     } catch (err) {
       console.error('加载用户信息失败:', err);
