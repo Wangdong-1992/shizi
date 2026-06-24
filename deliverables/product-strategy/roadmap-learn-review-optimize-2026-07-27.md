@@ -6,6 +6,7 @@
 > - 文件名"2026-07-27"是**当时预设的"目标完成日期"**，并非实际发布日期
 > - 本路线图描述的 V2.1 / V2.2 / V2.3 递进交付**已全部完成**（commit 链路见 `deliverables/product-strategy/full-report-learn-review-optimize-2026-07-27.md` 顶部说明）
 > - V2.4+ 后续规划见 `docs/system_design_v24.md`
+> - V2.5.1 已删除描红功能(Step3),本路线图 R-08"学习流程四步递进"已修订为"三步递进",详见正文
 
 **日期**：2026-07-27
 **类型**：路线图更新
@@ -156,7 +157,7 @@ Day 8-17                                             │ P2          │
 | 打通recordReview闭环 | R-05 | recordReview调用后learning_progress同步更新box_level/next_review_date；复习结果影响后续优先级 | 后端 | 1天 | Day 4 |
 | 实现复习优先级算法 | R-06 | 复习列表按urgency*0.5+difficulty*0.3+random*0.2排序；即将遗忘的字排在最前 | 后端 | 0.5天 | Day 5 |
 | 实现五级掌握状态机 | R-07 | 状态按new→seeing→familiar→mastered→solid变迁；连续2次错误触发降级；跨天验证正确才可升mastered | 后端 | 1天 | Day 5 |
-| 学习流程四步递进 | R-08 | 依次展示展示释义→再认练习→描红书写→跟读产出；每步有独立完成判定；ASR失败降级为选择题 | 前端 | 1天 | Day 5-7 |
+| 学习流程三步递进 | R-08 | 依次展示展示释义→再认练习→跟读产出；每步有独立完成判定；ASR失败降级为选择题 【V2.5.1 修订：原四步删除了描红书写】 | 前端 | 1天 | Day 5-7 |
 
 **V2.2 验收检查清单**：
 - [ ] learning_progress 包含 box_level(1-5), next_review_date, review_interval, status 五级字段
@@ -165,7 +166,7 @@ Day 8-17                                             │ P2          │
 - [ ] 复习列表按 urgency*0.5 + difficulty*0.3 + random*0.2 排序
 - [ ] 掌握状态五级变迁正确：new→seeing→familiar→mastered→solid
 - [ ] 连续2次错误触发降级（mastered→familiar, familiar→seeing 等）
-- [ ] 新字学习流程按四步递进执行，每步有完成判定
+- [ ] 新字学习流程按三步递进执行，每步有完成判定
 - [ ] ASR失败3次后降级为选择题
 - [ ] 旧数据迁移完成，无数据丢失，迁移覆盖率>99%
 - [ ] 端到端联调测试通过
