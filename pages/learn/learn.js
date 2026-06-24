@@ -1557,8 +1557,10 @@ Page({
   },
 
   // ==================== R-13: 去复习 ====================
+  // review 是 tabBar 页面 (app.json tabBar.list), 必须用 switchTab
+  //   之前用 navigateTo 会静默失败, 按钮点了没反应
   goToReview: function() {
-    wx.navigateTo({ url: '/pages/review/review' });
+    wx.switchTab({ url: '/pages/review/review' });
   },
 
   // ==================== 兼容方法 ====================
