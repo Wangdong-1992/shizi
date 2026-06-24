@@ -38,6 +38,9 @@ function calculateNextReview(boxLevel, isCorrect) {
  * @returns {number} 新盒子等级
  */
 function updateBoxLevel(boxLevel, isCorrect) {
+  // M11: 防 boxLevel=0 / NaN / undefined, 否则 BOX_INTERVALS[newLevel-1] 返回 undefined
+  //   → nextReviewDate = NaN, 优先级算法里混入 NaN 排序错乱
+  boxLevel = Math.max(1, Number(boxLevel) || 1);
   if (isCorrect) {
     return Math.min(boxLevel + 1, 5);
   }

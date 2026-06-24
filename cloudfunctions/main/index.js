@@ -781,8 +781,26 @@ exports.main = async (event, context) => {
           masteredChars.push(charIdStr);
           rewards.push({ type: 'star', source: 'single_learn', amount: 1 });
 
-          // 检查连续学习奖励
-          const streak = (user.streak_count || 0) + 1;
+          // M10: streak 跳天重置 (PRD: 连续学习)
+          //   - 首次学习(lastDate 空): 1
+          //   - 今天已学过(lastDate == today): 沿用当前 streak, 不重复 +1
+          //   - 昨天学的(lastDate == yesterday): streak + 1
+          //   - 跳了 2 天以上: 重置为 1
+          const todayObj = new Date();
+          const todayStr = todayObj.getFullYear() + '-' + String(todayObj.getMonth() + 1).padStart(2, '0') + '-' + String(todayObj.getDate()).padStart(2, '0');
+          const yesterdayObj = new Date(todayObj.getTime() - 86400000);
+          const yesterdayStr = yesterdayObj.getFullYear() + '-' + String(yesterdayObj.getMonth() + 1).padStart(2, '0') + '-' + String(yesterdayObj.getDate()).padStart(2, '0');
+          const lastDate = user.last_learn_date || '';
+          let streak;
+          if (!lastDate) {
+            streak = 1;
+          } else if (lastDate === todayStr) {
+            streak = user.streak_count || 1;
+          } else if (lastDate === yesterdayStr) {
+            streak = (user.streak_count || 0) + 1;
+          } else {
+            streak = 1;
+          }
           if (streak % 10 === 0) {
             rewards.push({ type: 'star', source: 'streak_10', amount: 3 });
           }

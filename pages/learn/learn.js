@@ -153,6 +153,10 @@ Page({
     var masteredChar = app.globalData.fromMasteredChar;
     if (masteredChar) {
       app.globalData.fromMasteredChar = null;
+      // M8: checkMasteredChar 之前没重置 batch, 旧 batch 会触发 mini-review 复习错字
+      if (!this.data.miniReviewActive) {
+        this.setData(this.resetLearnedBatch());
+      }
       this.setData(Object.assign({
         // 字本身
         currentChar: masteredChar.char,
@@ -206,6 +210,28 @@ Page({
     };
   },
 
+  /**
+   * M8: 重置学习批次 + 小复习状态
+   * 抽出来供 loadChar / checkMasteredChar / continueLearning 共用
+   * 切字时(从 mastered 列表二次进入)调它,避免旧 batch 触发 mini-review 复习错字
+   * 注: 调用方需自行决定是否在 mini-review 进行中调(loadChar 守卫 !miniReviewActive)
+   */
+  resetLearnedBatch: function() {
+    return {
+      learnedBatch: [],
+      miniReviewActive: false,
+      miniReviewIndex: 0,
+      miniReviewChars: [],
+      miniReviewOptions: [],
+      miniReviewAnswered: false,
+      miniReviewCorrect: false,
+      miniReviewSelectedId: '',
+      miniReviewResults: [],
+      miniReviewCompleted: false,
+      miniReviewSummary: null
+    };
+  },
+
   initRecorder: function() {
     var self = this;
     recorderManager = wx.getRecorderManager();
@@ -239,19 +265,7 @@ Page({
 
     // 如果是新一轮学习（非小复习触发），重置批次
     if (!self.data.miniReviewActive) {
-      self.setData({
-        learnedBatch: [],
-        miniReviewActive: false,
-        miniReviewIndex: 0,
-        miniReviewChars: [],
-        miniReviewOptions: [],
-        miniReviewAnswered: false,
-        miniReviewCorrect: false,
-        miniReviewSelectedId: '',
-        miniReviewResults: [],
-        miniReviewCompleted: false,
-        miniReviewSummary: null
-      });
+      self.setData(self.resetLearnedBatch());
     }
 
     // R-13: 先查每日配额
@@ -1525,26 +1539,13 @@ Page({
   },
 
   /**
-   * 继续学习：清空批次，加载下一个字
+   * 继续学习: 清空批次 + 状态机重置 + 加载下一个字
+   * M6: 用 resetLearnStateMachine + resetLearnedBatch 替代手写 reset,
+   *   补全 isRecording/asrProcessing/showChoiceMode/feedbackShow 等字段
    */
   continueLearning: function() {
     var self = this;
-    self.setData({
-      learnedBatch: [],
-      miniReviewActive: false,
-      miniReviewIndex: 0,
-      miniReviewChars: [],
-      miniReviewOptions: [],
-      miniReviewAnswered: false,
-      miniReviewCorrect: false,
-      miniReviewSelectedId: '',
-      miniReviewResults: [],
-      miniReviewCompleted: false,
-      miniReviewSummary: null,
-      currentStep: 1,
-      stepCompleted: [false, false, false],
-      stepResults: [{}, {}, {}]
-    });
+    self.setData(Object.assign({}, self.resetLearnedBatch(), self.resetLearnStateMachine()));
     self.loadChar();
   },
 
