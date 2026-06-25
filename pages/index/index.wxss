@@ -320,12 +320,10 @@ page {
 
 .learn .action-icon {
   background: linear-gradient(135deg, #4A90D9 0%, #7AB3ED 100%);
-  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
 }
 
 .review .action-icon {
   background: linear-gradient(135deg, #FF9F43 0%, #FFB976 100%);
-  box-shadow: 0 8rpx 24rpx rgba(255, 159, 67, 0.4);
 }
 
 .action-content { flex: 1; }
@@ -449,7 +447,6 @@ page {
   height: 112rpx;
   border-radius: 50%;
   border: 6rpx solid white;
-  box-shadow: 0 8rpx 24rpx rgba(255, 159, 67, 0.4);
 }
 
 /* ===================== */

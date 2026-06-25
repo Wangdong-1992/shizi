@@ -43,7 +43,8 @@ page {
   border-radius: 24rpx;
   padding: 40rpx 32rpx;
   margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
+  border: 1rpx solid #EAEAEA;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
 }
 
 /* 看字说音 (speak_char): 内容只有 1 个大字 + 录音按钮, 撑开卡片让视觉居中 */
@@ -140,15 +141,17 @@ page {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  background: linear-gradient(135deg, #FF9F43 0%, #FECA57 100%);
+  background: #FFF7E6; /* amber-50: 浅米黄, 跟 accent 色系呼应但不抢戏 */
   padding: 16rpx 40rpx;
   border-radius: 40rpx;
-  box-shadow: 0 6rpx 24rpx rgba(255, 159, 67, 0.4);
+  border: 1rpx solid #FDE68A; /* amber-200 浅边 */
 }
 
+/* 超连击: Geist 风格 amber 浅底 + 深文字, 不用彩虹 + 发光 */
 .combo-badge.super-combo-glow {
-  background: linear-gradient(135deg, #FF6B6B 0%, #FF9F43 50%, #FECA57 100%);
-  box-shadow: 0 0 40rpx rgba(255, 107, 107, 0.6), 0 0 80rpx rgba(255, 159, 67, 0.3);
+  background: #FEF3C7; /* amber-100 更深一点的浅黄 */
+  border: 1rpx solid #FBBF24; /* amber-400 强调边 */
+  color: #92400E; /* amber-800 深文字, WCAG AA 合规 */
   animation: superComboPulse 0.8s ease-in-out infinite alternate;
 }
 
@@ -609,7 +612,7 @@ page {
   border-radius: 48rpx;
   padding: 24rpx 80rpx;
   border: none;
-  box-shadow: 0 6rpx 24rpx rgba(255, 159, 67, 0.4);
+  /* box-shadow removed (Geist 风格, 不用彩色发光) */
 }
 
 /* ====== 星星粒子 ====== */

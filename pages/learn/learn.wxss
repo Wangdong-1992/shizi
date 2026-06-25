@@ -188,7 +188,7 @@ page {
 .speak-btn {
   background: linear-gradient(135deg, #4A90D9, #7AB3ED);
   color: white;
-  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+  box-shadow: none;
 }
 
 .step1-action {
@@ -242,7 +242,7 @@ page {
   color: white;
   padding: 24rpx 56rpx;
   border-radius: 48rpx;
-  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+  box-shadow: none;
   margin-bottom: 48rpx;
   transition: transform 0.15s;
 }
@@ -691,7 +691,7 @@ page {
   color: white;
   padding: 20rpx 48rpx;
   border-radius: 48rpx;
-  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+  box-shadow: none;
   margin-bottom: 40rpx;
   transition: transform 0.15s;
 }
@@ -813,7 +813,7 @@ page {
 .summary-btn.primary {
   background: linear-gradient(135deg, #4A90D9, #7AB3ED);
   color: white;
-  box-shadow: 0 8rpx 24rpx rgba(74, 144, 217, 0.4);
+  box-shadow: none;
 }
 
 .summary-btn.secondary {
