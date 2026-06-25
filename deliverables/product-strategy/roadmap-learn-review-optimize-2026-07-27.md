@@ -7,6 +7,7 @@
 > - 本路线图描述的 V2.1 / V2.2 / V2.3 递进交付**已全部完成**（commit 链路见 `deliverables/product-strategy/full-report-learn-review-optimize-2026-07-27.md` 顶部说明）
 > - V2.4+ 后续规划见 `docs/system_design_v24.md`
 > - V2.5.1 已删除描红功能(Step3),本路线图 R-08"学习流程四步递进"已修订为"三步递进",详见正文
+> - **V2.5.2（2026-06-25）属 bug fix 批次,不是新功能**,本路线图不再追加 V2.5.2 节点。详细 bug 索引见 `docs/儿童识字应用_PRD_V2.5.0.md` 第 14 节。
 
 **日期**：2026-07-27
 **类型**：路线图更新
