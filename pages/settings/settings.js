@@ -406,7 +406,10 @@ Page({
       name: 'main',
       data: {
         action: 'resetUserData',
-        data: { confirm: true }
+        data: {
+          openid: app.globalData.openid || 'guest',
+          confirm: true
+        }
       },
       success: function(res) {
         console.log('resetUserData result:', JSON.stringify(res.result));
