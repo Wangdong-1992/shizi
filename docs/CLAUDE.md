@@ -190,8 +190,6 @@ this.setData(Object.assign({
 
 **为什么需要它：** 修复 V2.2 上线后"上一个字学完直接进入下一个字时残留 learnCompleted=true"导致的"学会了"弹窗 bug（V2.3 修复 1）。
 
-## V2.4 新增工具
-
 ## 已完成功能
 
 - [x] 云函数部署（login, main）
@@ -225,6 +223,10 @@ this.setData(Object.assign({
 - [x] **V2.3**：settings 页加 "清除学习数据" 按钮（带二次确认）
 - [x] **V2.3 架构优化**：pages/learn/learn.js 抽出 resetLearnStateMachine 公共方法，loadChar / checkMasteredChar 共用
 - [x] **V2.5.1**：删除描红功能（Step3），学习页改为三步流程（释义→再认→跟读）
+- [x] **V2.5.2 P0 修复（12 个）**：B1 云函数鉴权拦截 + B3/B4 日志脱敏 + B5/B6 数据一致性 + B7/B8 老字段退役 + B9-B12 前端 UX
+- [x] **V2.5.2 P1 修复（10 个）**：M1 review onUnload 清理录音 + M2 settings switch 回滚 + M4/M5 mastered 刷新+网络错误 + M6/M8 状态机 batch reset 抽取 + M7 录音 timer 泄漏 + M10 streak 跳天重置 + M11 boxLevel NaN 防御
+- [x] **V2.5.2 现场修复**：`去复习`按钮 navigateTo→switchTab、loadOptions 静默失败加 toast、comboLevel undefined setData、首页 spinner 卡死 8s 兜底超时
+- [x] **V2.5.2 dev tools 工具**：app.js 自动注入 `devMode: true`(envVersion='develop' 检测),B1 鉴权 + PUBLIC_ACTIONS 白名单 + DEV_OPENIDS 白名单支持 dev tools 调试
 
 ## 已修复Bug
 
@@ -282,6 +284,31 @@ this.setData(Object.assign({
 
 **修复**：`getStats` 改用 `.where().get().length`（去重后算 unique char_id 数），不用 `.count()`。
 
+### V2.5.2 修复批次（2026-06-24 ~ 06-25，共 26 个）
+
+**安全 / 鉴权（B1）**：21 个 action 信任客户端 `data.openid` → switch 入口强制 `wxContext.OPENID` 校验 + `PUBLIC_ACTIONS` 白名单（`getOptions`/`getQuestionOptions`/`getAudio` 无需 openid）+ `devMode + DEV_OPENIDS` 白名单 dev tools 调试。
+
+**隐私日志（B3/B4）**：`getPhoneNumber` 手机号 `前3+****+后4` 脱敏；`wxLogin` 不再打印 token 明文。
+
+**数据一致性（B5/B6）**：`recordLearn` 的 `learning_progress` 失败时抛错（原 catch 静默吞掉 → 字被标掌握但永远不进复习队列）；`recordReview` 的 progress 更新失败返 `success: false`（原 `success: true` 是静默失败 → Leitner Box 不降级）。
+
+**老字段退役（B7/B8）**：`getNextChar` / `getAchievements` 改用 `learning_progress` 查"已掌握"（V2.3 同源修复在 getStats/getMasteredChars 已做，这两个 action 漏改）→ 新学字 `mastered_chars=[]` 不再被当新字、成就页不再基于假阳性。
+
+**前端 UX（B9-B12）**：B9 learn.js `stepResults[3]` 越界写入（V2.5.1 删描红残留）→ `[2]`；B10 review.js 看字选义传 selOpt 给 classifyError + 删无效三元孤立破折号；B11 review.js `handleAsrFailure` 回滚 `asrProcessing/recording`；B12 index.js `loadIndexData` 加 `loading` 守卫防并发 setData 竞争。
+
+**前端 P1（M1/M2/M4/M5/M6/M7/M8/M10/M11）**：
+- M1 review.js 加 `onUnload` 清理 `recorderManager` + `recordTimeout`(录音切 tab 麦克风持续占用)
+- M2 settings.js switch 拒订阅 3 处回滚(`pushSubscribed: false`)
+- M4 mastered.js 加 `onShow` 重新拉数据
+- M5 mastered.js 区分 `networkError` vs `empty` + `retryLoad`
+- M6 learn.js `continueLearning` 改调 `resetLearnStateMachine()` + 抽 `resetLearnedBatch()` helper
+- M7 learn.js `startRecord/stopRecord` 开头统一 `clearTimeout`(4.5s 超时句柄泄漏)
+- M8 learn.js `checkMasteredChar` 补 batch reset(旧 batch 触发 mini-review 复习错字)
+- M10 main/index.js `streak_count` 跳天重置(比对 `last_learn_date` 与今/昨)
+- M11 spaced-repetition.js `updateBoxLevel` 防 `boxLevel=0/NaN`(`Math.max(1, Number(boxLevel) || 1)`)
+
+**现场发现**：`去复习`按钮 `navigateTo` → `switchTab`(tabBar 页面 navigateTo 静默失败)、review.js `loadOptions` 静默改 toast、review.js `comboLevel` undefined 警告(getComboLevel 不返回 level 字段)、首页 `getOpenid` 8s 兜底超时(SDK 3.16.0 timeout 不触发 fail 回调,await 永远挂起) + `loadIndexData` 用 `_loadingFlag` + finally 保证可恢复。
+
 ## 开发约定
 
 1. **ES5 语法**：对象回调用 `key: function(){}` 不用 `key(){}`，`var self = this` 模式，避免 `.bind()` 链式调用
@@ -294,17 +321,21 @@ this.setData(Object.assign({
 8. **切字必重置**：learn / review 等页面切字时**必须**调 `resetLearnStateMachine()`（或在 review 的 `showCurrentQuestion` 写完整重置 setData），避免上一个字的状态残留
 9. **密钥不进代码**：微信 AppSecret、百度 API Key/Secret 等敏感配置**必须**用云函数环境变量（`process.env`），代码里 `if (!xxx) throw new Error` 兜底，缺变量直接 fail 不静默
 10. **主包 2MB 红线**：微信小程序主包硬限制 2MB。新增目录/批量文件前，必须判断这东西是不是该进主包——云函数代码、脚本、文档、node_modules 都不进——如果确定不进，立刻同步更新 `project.config.json` 的 `packOptions.ignore`。写完代码后跑一次「上传」看预估包大小，不要等提测才发现超限。当前排除清单见 `project.config.json` 的 `packOptions.ignore`
-11. **算法抽离优先于库强集成（V2.5 教训→V2.5.1 反转）**：V2.5 抽算法移植了 hanzi-writer 4-check 评分，V2.5.1 验证后发现：描红功能本身被删除，stroke-grader 模块随之移除。此原则仍有效（适用于有长期价值的算法），但需先确认功能是否保留再决定是否抽算法。
+11. **算法抽离需先确认功能长期保留**：抽算法移植是有成本的（写测试、维护、留 PoC 记录），若功能可能被砍，迁移工时直接归零。原则：算法独立性值得追求，但功能稳定性是前置条件。
+12. **B1 云函数鉴权拦截（V2.5.2）**：`cloudfunctions/main/index.js` switch 入口强制 `wxContext.OPENID` 校验。优先级:**公共 action 白名单（`PUBLIC_ACTIONS = ['getOptions','getQuestionOptions','getAudio']`）→ devMode + `DEV_OPENIDS` 白名单 → 生产 openid 严格匹配**。新增用户操作类 action 时,默认需要 openid,必须能解释为什么不进 `PUBLIC_ACTIONS`。
+13. **tabBar 页面跳转用 switchTab（V2.5.2 现场发现）**：`app.json` `tabBar.list` 里的页面（首页/学习/复习/我的）必须用 `wx.switchTab`,**用 `navigateTo` 会静默失败**(基础库 throw 但不打 console,按钮点了没反应)。复制粘贴跳转代码时先查目标页是否 tabBar。
+14. **`wx.cloud.callFunction` success 回调三分支（V2.5.2）**:`success` 不区分业务成功/失败,只表示"网络+云函数返回了"。必须三分支:`res.result.success === true` 正常处理 / `res.result.success === false` toast + console.error / `fail` 网络异常 toast。漏 else 会让鉴权/业务失败静默,用户看到空白 UI 不知道为啥。
 
 ## 部署步骤
 
 1. 微信开发者工具导入项目，目录选择 `E:\claude\PMRD\shizi`，appid: `wxa2bbfca6b9ef6ebd`
 2. 开通云开发环境（环境 ID：`cloud1-d7geippqn581097e3`）
-3. **配置云函数环境变量**（V2.3 起必需）：
+3. **配置云函数环境变量**（V2.3 起必需，V2.5.2 加 1 项）：
    - 微信云开发控制台 → 云函数 → `main` → 配置 → 环境变量
-   - 添加 4 个：`WX_APPID` / `WX_APPSECRET` / `BAIDU_API_KEY` / `BAIDU_SECRET_KEY`
+   - 添加 5 个：`WX_APPID` / `WX_APPSECRET` / `BAIDU_API_KEY` / `BAIDU_SECRET_KEY` / `DEV_OPENIDS`
    - WX_APPID 用 `wxa2bbfca6b9ef6ebd`（公开）
-   - 其余 3 个从对应平台后台拿，**绝对不能用代码里那串老密钥**（git 历史已泄露，视为废）
+   - 其余 4 个从对应平台后台拿，**绝对不能用代码里那串老密钥**（git 历史已泄露，视为废）
+   - `DEV_OPENIDS`：**dev tools 调试专用白名单**(逗号分隔 openid 列表,**生产环境必须留空** = 完全禁止 devMode);客户端 dev tools 模式下自动注入 `devMode: true`,B1 鉴权走白名单分支绕过 wxContext 校验。获取 openid:DevTools Console 跑 `console.log(app.globalData.openid)`
 4. 上传云函数：右键 `cloudfunctions/main` →「上传并部署：云端安装依赖」
 5. 预览测试
 
@@ -314,6 +345,7 @@ this.setData(Object.assign({
 - **已做止血**：V2.3 起改用 `process.env`，启动时校验。
 - **仍需用户做**：去微信公众平台/百度智能云后台**重置对应密钥**，并在云开发控制台配新值。老密钥视为已泄露。
 - **未来部署前**：若看到 `if (!process.env.XXX) throw` 风格的代码，新部署必须先配环境变量，否则会启动失败。
+- **V2.5.2 新增 B1 鉴权拦截**：21 个 action 入口强制 `wxContext.OPENID` 校验,防横向越权。**生产路径不接受任何 `data.openid` 伪造**(会被直接拒)。dev tools 调试走 `DEV_OPENIDS` 环境变量白名单 + 前端自动注入 `devMode: true`,**生产环境必须清空 `DEV_OPENIDS`**,否则任何持有合法 dev 工具账号的人都能绕过鉴权。
 
 ## 🔧 云数据库索引（性能必需）
 

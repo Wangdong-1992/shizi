@@ -19,6 +19,7 @@
 | V2.4.0 | 2026/06/06 | 王栋 | 描红字形贴合(SVG path) + 笔顺纠正增强 + 首页UI重设计 + 文档同步 |
 | V2.5.0 | 2026/06/23 | 王栋 | 描红评分重做：hanzi-writer 4-check算法移植(stroke-grader.js)，坐标系修正，47项单测全过 |
 | V2.5.1 | 2026/06/23 | 王栋 | 删除描红功能（Step3），保留Step1释义→Step2再认→Step4跟读三步流程 |
+| V2.5.2 | 2026/06/25 | 王栋 | P0/P1 大批量 bug 修复（26 个）+ B1 云函数鉴权拦截 + dev tools 工具链 |
 
 ---
 
@@ -481,6 +482,30 @@ TTS拉取 + 自动重试。百度TTS直链带一次性 `access_token`，token偶
 | V2.3 | getStats走降级路径返回老数据 | 首页9 vs 列表页1 | .count()抛异常触发降级 |
 | V2.3 | 密钥硬编码泄露 | git历史有明文密钥 | 剥离到云函数环境变量 |
 | V2.5 | DTW坐标系bug | CSS像素vs 200×200逻辑混用，dpr变化时阈值失效 | V2.5统一到userLogical坐标修正 |
+| **V2.5.2** | **B1 云函数无鉴权（横向越权）** | 任何用户拿到他人 openid 可读/写/删他人学习数据 | switch 入口强制 wxContext.OPENID 校验 + PUBLIC_ACTIONS 白名单 + devMode + DEV_OPENIDS 白名单 |
+| V2.5.2 | B3 手机号明文日志 | 手机号泄露到云函数日志 | 前3+****+后4 脱敏 |
+| V2.5.2 | B4 token 明文日志 | 7 天有效 token 泄露到日志 | 删 token 日志,只记 openid 末 6 位 |
+| V2.5.2 | B5 recordLearn 静默失败 | 字被记"已掌握"但永远不进复习队列 | learning_progress 失败抛错,前端可感知 |
+| V2.5.2 | B6 recordReview 静默失败 | review_logs 写入了但 Leitner Box 未降级 | progress 失败时返 success:false |
+| V2.5.2 | B7 getNextChar 仍读 mastered_chars | 新学字 mastered_chars=[] 被当新字推出 | 改读 learning_progress |
+| V2.5.2 | B8 getAchievements 仍读 mastered_chars | 成就页进度数字基于 V2.1 假阳性 | 改读 learning_progress（V2.3 漏改） |
+| V2.5.2 | B9 stepResults[3] 越界写入 | submitLearnResult 永远读不到该结果,recordLearn 不调用,mastered 永远不增 | V2.5.1 删描红残留,改 `[2]` |
+| V2.5.2 | B10 review 看字选义反馈卡破折号 + classifyError 空参 | "正确答案:天 — " 孤立破折号,错因永远 unknown | 删无效三元,传 selOpt 给 classifyError |
+| V2.5.2 | B11 review ASR 转圈卡死 | WXML "正在识别..." 永远显示 | handleAsrFailure 加 asrProcessing:false |
+| V2.5.2 | B12 首页 onShow 并发 setData 竞争 | 数字跳动/entranceReady 闪烁 | loadIndexData 加 loading 守卫 |
+| V2.5.2 | M1 review 录音切 tab 麦克风持续占用 | recorderManager 是全局单例,onUnload 没解绑回调 | 加 onUnload 清理 |
+| V2.5.2 | M2 settings switch 拒订阅不回滚 | switch 视觉开了但 pushSubscribed 没变 | 3 处回滚 setData({pushSubscribed: false}) |
+| V2.5.2 | M4 mastered 缺 onShow | 从 review 回来新掌握的字符看不到 | 加 onShow 重新拉 |
+| V2.5.2 | M5 mastered 网络失败伪装空状态 | 用户可能重学已会的字 | 区分 networkError vs empty + retryLoad |
+| V2.5.2 | M6 continueLearning 手写 reset 漏字段 | 录音/ASR 状态残留到下一字 | 改调 resetLearnStateMachine() |
+| V2.5.2 | M7 录音 4.5s timeout 句柄泄漏 | 旧 timeout 会强停新录音,识别音频被截断 | startRecord/stopRecord 开头统一 clearTimeout |
+| V2.5.2 | M8 checkMasteredChar 漏 batch reset | 旧 batch 触发 mini-review 复习错字 | 抽 resetLearnedBatch() helper |
+| V2.5.2 | M10 streak_count 跳天不重置 | 与 PRD"连续学习"定义不符 | 比对 last_learn_date 与今/昨 |
+| V2.5.2 | M11 updateBoxLevel NaN 防御 | boxLevel=0 时 nextReviewDate 变 NaN,排序错乱 | Math.max(1, Number(boxLevel) \|\| 1) |
+| V2.5.2 现场 | "去复习"按钮 navigateTo 静默失败 | review 是 tabBar 页面,navigateTo 不打 console 报错 | 改 wx.switchTab |
+| V2.5.2 现场 | loadOptions success:false 静默 | 用户看到空白选项区不知为啥 | 加 else 分支 toast |
+| V2.5.2 现场 | comboLevel undefined setData 警告 | getComboLevel 不返回 level 字段 | 改用 comboCount >= 10 直接判定 |
+| V2.5.2 现场 | 首页 spinner 永远卡住 | getOpenid await 永远不返回(SDK 3.16.0 timeout 不触发 fail 回调) | 8s 兜底超时 + loadIndexData 用 _loadingFlag + finally |
 
 ---
 
