@@ -44,59 +44,51 @@ if (!BAIDU_API_KEY || !BAIDU_SECRET_KEY) {
   throw new Error('请在云函数环境变量中配置 BAIDU_API_KEY 和 BAIDU_SECRET_KEY');
 }
 
-// 百度 Access Token 缓存
-let baiduAccessToken = null;
-let tokenExpireTime = 0;
+// V2.5.3: 拆分模块 (P3-1 审计重构) — 微信/百度/格式化 helpers
+//   modules/format.js: 日期/拼音 helper (消除 6+ 处重复)
+//   modules/wechat.js: code2openid / access_token / 订阅消息
+//   modules/baidu.js: TTS cache + rate limit + ASR + access_token
+const Format = require('./modules/format');
+const Wechat = require('./modules/wechat');
+const Baidu = require('./modules/baidu');
+const baidu = Baidu.createBaiduClient({ API_KEY: BAIDU_API_KEY, SECRET_KEY: BAIDU_SECRET_KEY });
+const fetchWxAccessToken = Wechat.createWxAccessTokenFetcher(WX_APPID, WX_APPSECRET);
 
-// ============================================================
-// TTS URL 缓存 + Rate Limit (P1-3, 2026-06-29 审计)
-// getAudio 在 PUBLIC_ACTIONS 白名单, 完全无鉴权, 任何人能调, 必须限流
-// TTS URL 永久 cache (字符有限, ~4500 种组合)
-// Rate limit 按 IP 限 (云函数实例内 in-memory, 简单防刷, 多实例下不严格)
-// ============================================================
-const TTS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 min
-const RATE_LIMIT_MAX_TTS = 60; // 每 IP 每分钟 60 次
-const RATE_LIMIT_MAX_ASR = 30; // ASR 更贵, 限更严
-const ttsUrlCache = new Map();
-const rateLimitBuckets = new Map();
+// 成就配置 (V2.5.3: 抽到 modules/achievements.js)
+const { ACHIEVEMENTS } = require('./modules/achievements');
 
-function getCachedTtsUrl(text) {
-  const hit = ttsUrlCache.get(text);
-  if (hit && hit.expiresAt > Date.now()) {
-    return hit.url;
-  }
-  return null;
+// 微信 code 换 openid
+function code2openid(code) {
+  return Wechat.code2openid(WX_APPID, WX_APPSECRET, code);
 }
 
-function setCachedTtsUrl(text, url) {
-  ttsUrlCache.set(text, { url: url, expiresAt: Date.now() + TTS_CACHE_TTL });
-  // 防御性: 如果 cache 超过 10000 条, 清一半老的 (防止长期占用内存)
-  if (ttsUrlCache.size > 10000) {
-    let count = 0;
-    const targetDelete = 5000;
-    for (const key of ttsUrlCache.keys()) {
-      ttsUrlCache.delete(key);
-      if (++count >= targetDelete) break;
-    }
-  }
+// 微信 Access Token 缓存
+function getWxAccessToken() {
+  return fetchWxAccessToken();
 }
 
-function checkRateLimit(key, max) {
-  const now = Date.now();
-  let bucket = rateLimitBuckets.get(key) || [];
-  // 清除过期时间戳
-  bucket = bucket.filter(function (t) { return now - t < RATE_LIMIT_WINDOW; });
-  if (bucket.length >= max) {
-    return false;
-  }
-  bucket.push(now);
-  rateLimitBuckets.set(key, bucket);
-  return true;
+// R-15: 发送微信服务通知
+function sendSubscribeMessage(accessToken, openid, message) {
+  return Wechat.sendSubscribeMessage(accessToken, openid, message);
 }
 
+// 获取百度 Access Token
+function getBaiduAccessToken() {
+  return baidu.getAccessToken();
+}
+
+// 下载文件为 Buffer
+function downloadFile(url) {
+  return baidu.downloadFile(url);
+}
+
+// 百度语音识别
+function baiduASR(fileBuffer, devPid) {
+  return baidu.asr(fileBuffer, devPid, getClientIp());
+}
+
+// 获取客户端 IP (限流 key 用)
 function getClientIp() {
-  // wxContext.CLIENTIP 在云函数中可用, 兜底 'unknown'
   try {
     return cloud.getWXContext().CLIENTIP || 'unknown';
   } catch (e) {
@@ -104,236 +96,9 @@ function getClientIp() {
   }
 }
 
-// 间隔重复算法 END
-// ============================================================
-
-// 成就配置
-const ACHIEVEMENTS = [
-  { id: 'ACH001', name: '初次识字', requirement: 1, icon: '🎓', reward: { type: 'star', amount: 3 } },
-  { id: 'ACH002', name: '小小学生', requirement: 50, icon: '🌟', reward: { type: 'star', amount: 10 } },
-  { id: 'ACH003', name: '认字小达人', requirement: 200, icon: '📖', reward: { type: 'flower', amount: 2 } },
-  { id: 'ACH004', name: '认字小高手', requirement: 500, icon: '🏅', reward: { type: 'flower', amount: 5 } },
-  { id: 'ACH005', name: '汉字小博士', requirement: 1000, icon: '🎖️', reward: { type: 'flower', amount: 10 } },
-  { id: 'ACH006', name: '汉字小状元', requirement: 2000, icon: '👑', reward: { type: 'flower', amount: 20 } },
-  { id: 'ACH007', name: '汉字小天才', requirement: 3500, icon: '🌈', reward: { type: 'flower', amount: 50 } }
-];
-
-// 微信 code 换 openid
-function code2openid(code) {
-  return new Promise((resolve, reject) => {
-    const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${WX_APPID}&secret=${WX_APPSECRET}&js_code=${code}&grant_type=authorization_code`;
-
-    const req = https.get(url, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const result = JSON.parse(data);
-          if (result.openid) {
-            resolve(result.openid);
-          } else {
-            console.error('code2openid failed:', result);
-            resolve(null);
-          }
-        } catch (e) {
-          reject(e);
-        }
-      });
-    });
-
-    req.on('error', (err) => {
-      console.error('code2openid network error:', err.message);
-      resolve(null);
-    });
-
-    req.setTimeout(5000, () => {
-      console.error('code2openid timeout');
-      req.destroy();
-      resolve(null);
-    });
-  });
-}
-
-// 微信 Access Token 缓存（用于 getPhoneNumber 等需要 access_token 的接口）
-let wxAccessToken = null;
-let wxAccessTokenExpire = 0;
-
-function getWxAccessToken() {
-  return new Promise((resolve, reject) => {
-    if (wxAccessToken && Date.now() < wxAccessTokenExpire) {
-      return resolve(wxAccessToken);
-    }
-    const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${WX_APPID}&secret=${WX_APPSECRET}`;
-    https.get(url, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const result = JSON.parse(data);
-          if (result.access_token) {
-            wxAccessToken = result.access_token;
-            wxAccessTokenExpire = Date.now() + (result.expires_in - 300) * 1000;
-            resolve(wxAccessToken);
-          } else {
-            reject(new Error('获取微信 access_token 失败: ' + JSON.stringify(result)));
-          }
-        } catch (e) {
-          reject(e);
-        }
-      });
-    }).on('error', reject);
-  });
-}
-
-// R-15: 发送微信服务通知
-function sendSubscribeMessage(accessToken, openid, message) {
-  return new Promise((resolve, reject) => {
-    var postData = JSON.stringify({
-      touser: openid,
-      template_id: message.template_id,
-      page: message.page || '',
-      data: message.data || {},
-      miniprogram_state: 'formal'
-    });
-    var url = 'https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=' + accessToken;
-    var req = https.request(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    }, function(res) {
-      var body = '';
-      res.on('data', function(chunk) { body += chunk; });
-      res.on('end', function() {
-        try { resolve(JSON.parse(body)); }
-        catch (e) { reject(e); }
-      });
-    });
-    req.on('error', reject);
-    req.write(postData);
-    req.end();
-  });
-}
-
-// 获取百度 Access Token
-function getBaiduAccessToken() {
-  return new Promise((resolve, reject) => {
-    if (baiduAccessToken && Date.now() < tokenExpireTime) {
-      return resolve(baiduAccessToken);
-    }
-
-    const grantType = 'client_credentials';
-    const authUrl = `https://aip.baidubce.com/oauth/2.0/token?grant_type=${grantType}&client_id=${BAIDU_API_KEY}&client_secret=${BAIDU_SECRET_KEY}`;
-
-    https.get(authUrl, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const result = JSON.parse(data);
-          if (result.access_token) {
-            baiduAccessToken = result.access_token;
-            tokenExpireTime = Date.now() + (result.expires_in - 300) * 1000;
-            resolve(baiduAccessToken);
-          } else {
-            reject(new Error('获取 token 失败: ' + JSON.stringify(result)));
-          }
-        } catch (e) {
-          reject(e);
-        }
-      });
-    }).on('error', reject);
-  });
-}
-
-// 下载文件为 Buffer
-function downloadFile(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      const chunks = [];
-      res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => resolve(Buffer.concat(chunks)));
-    }).on('error', reject);
-  });
-}
-
-// 百度语音识别
-function baiduASR(fileBuffer, devPid = 80001) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const accessToken = await getBaiduAccessToken();
-      const boundary = '----FormBoundary' + Date.now();
-
-      const body = Buffer.concat([
-        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="dev_pid"\r\n\r\n${devPid}\r\n`),
-        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="speech"\r\n\r\n`),
-        fileBuffer,
-        Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="len"\r\n\r\n${fileBuffer.length}\r\n`),
-        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="rate"\r\n\r\n16000\r\n`),
-        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="channel"\r\n\r\n1\r\n`),
-        Buffer.from(`--${boundary}--\r\n`)
-      ]);
-
-      const options = {
-        hostname: 'vop.baidu.com',
-        path: '/server_api?access_token=' + accessToken,
-        method: 'POST',
-        headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': body.length
-        }
-      };
-
-      const req = https.request(options, (res) => {
-        const chunks = [];
-        res.on('data', chunk => chunks.push(chunk));
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(Buffer.concat(chunks).toString()));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      });
-
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
-
 // 比较拼音相似度
 function comparePinyin(target, result) {
-  if (!target || !result) return 0;
-
-  const normalize = function(p) {
-    return p.replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, function(match) {
-      var map = { 'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a', 'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e',
-            'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i', 'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o',
-            'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u', 'ǖ': 'v', 'ǘ': 'v', 'ǚ': 'v', 'ǜ': 'v' };
-      return map[match] || match;
-    }).toLowerCase();
-  };
-
-  var t = normalize(target);
-  var r = normalize(result);
-
-  if (t === r) return 1.0;
-
-  if (t.charAt(0) === r.charAt(0)) {
-    var shengmu = ['b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's', 'y', 'w'];
-    for (var i = 0; i < shengmu.length; i++) {
-      if (t.indexOf(shengmu[i]) === 0 && r.indexOf(shengmu[i]) === 0) {
-        return 0.75;
-      }
-    }
-  }
-
-  return 0.3;
+  return Baidu.comparePinyin(target, result);
 }
 
 // 云函数入口函数
@@ -1510,25 +1275,17 @@ exports.main = async (event, context) => {
       }
 
       case 'recognizeVoice': {
-        // 百度语音识别
+        // 百度语音识别 (V2.5.3: baidu.asr() 内部已含 rate limit + access_token)
         const { fileID, targetPinyin } = data;
         console.log('recognizeVoice called, fileID:', fileID, 'target:', targetPinyin);
-
-        // P1-3: ASR 比 TTS 更贵, 限更严 (30/min vs 60/min)
-        //   recognizeVoice 不在 PUBLIC_ACTIONS (走鉴权), 但仍防刷以保护百度 ASR 配额
-        const ipForAsr = getClientIp();
-        if (!checkRateLimit('asr:' + ipForAsr, RATE_LIMIT_MAX_ASR)) {
-          console.warn('[rate-limit] recognizeVoice 超限 ip:', ipForAsr);
-          return { success: false, reason: 'rate_limited' };
-        }
 
         try {
           // 下载音频文件（云存储 URL）
           const fileBuffer = await cloud.downloadFile({ fileID });
           console.log('文件下载成功，大小:', fileBuffer.fileContent.length);
 
-          // 调用百度 ASR（传入 Buffer）
-          const result = await baiduASR(fileBuffer.fileContent);
+          // 调用百度 ASR（rate limit 由 baidu.asr() 内部处理, 超限抛异常）
+          const result = await baiduASR(fileBuffer.fileContent, 80001, getClientIp());
           console.log('百度 ASR 返回:', JSON.stringify(result));
 
           // 解析结果
@@ -1546,15 +1303,17 @@ exports.main = async (event, context) => {
             };
           } else {
             console.error('ASR 识别失败:', result.err_msg);
-            // 识别失败，返回失败标记（不使用Math.random）
             return {
               success: false,
               reason: 'asr_empty'
             };
           }
         } catch (err) {
+          if (err.message && err.message.indexOf('请求过快') !== -1) {
+            console.warn('[rate-limit] recognizeVoice 超限');
+            return { success: false, reason: 'rate_limited' };
+          }
           console.error('recognizeVoice 错误:', err.message);
-          // 出错时返回失败标记（不使用Math.random）
           return {
             success: false,
             reason: 'exception'
@@ -1563,40 +1322,14 @@ exports.main = async (event, context) => {
       }
 
       case 'getAudio': {
-        // 百度 TTS 文字转语音
+        // 百度 TTS (V2.5.3: baidu.tts() 内部含 rate limit + 24h cache)
         const { char, pinyin } = data;
-        const text = char || pinyin || '';
-        if (!text) {
-          return { success: false, error: 'char 或 pinyin 必须传一个' };
-        }
-
-        // P1-3: Rate limit by IP (getAudio 是 PUBLIC_ACTIONS, 必须防刷)
-        const ip = getClientIp();
-        if (!checkRateLimit('tts:' + ip, RATE_LIMIT_MAX_TTS)) {
-          console.warn('[rate-limit] getAudio 超限 ip:', ip);
-          return { success: false, error: '请求过快, 请稍后再试' };
-        }
-
-        // P1-3: TTS URL cache hit (24h TTL, ~4500 种 char+pinyin 组合基本永久 cache)
-        const cachedUrl = getCachedTtsUrl(text);
-        if (cachedUrl) {
-          return { success: true, audioUrl: cachedUrl, message: 'cached' };
-        }
-
         try {
-          // 获取 access token（复用一个）
-          const accessToken = await getBaiduAccessToken();
-
-          // 调用百度 TTS API
-          const ttsUrl = `https://tsn.baidu.com/text2audio?lan=zh&ctp=1&cuid=shizi&tok=${accessToken}&tex=${encodeURIComponent(text)}&vol=9&per=0&spd=5&pit=5&aue=3`;
-
-          // P1-3: 缓存 URL (24h)
-          setCachedTtsUrl(text, ttsUrl);
-
+          const ttsResult = await baidu.tts(char || pinyin || '', getClientIp());
           return {
             success: true,
-            audioUrl: ttsUrl,
-            message: 'ok'
+            audioUrl: ttsResult.audioUrl,
+            message: ttsResult.cached ? 'cached' : 'ok'
           };
         } catch (err) {
           console.error('getAudio 错误:', err.message);
