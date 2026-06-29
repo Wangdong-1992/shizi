@@ -227,6 +227,14 @@ this.setData(Object.assign({
 - [x] **V2.5.2 P1 修复（10 个）**：M1 review onUnload 清理录音 + M2 settings switch 回滚 + M4/M5 mastered 刷新+网络错误 + M6/M8 状态机 batch reset 抽取 + M7 录音 timer 泄漏 + M10 streak 跳天重置 + M11 boxLevel NaN 防御
 - [x] **V2.5.2 现场修复**：`去复习`按钮 navigateTo→switchTab、loadOptions 静默失败加 toast、comboLevel undefined setData、首页 spinner 卡死 8s 兜底超时
 - [x] **V2.5.2 dev tools 工具**：app.js 自动注入 `devMode: true`(envVersion='develop' 检测),B1 鉴权 + PUBLIC_ACTIONS 白名单 + DEV_OPENIDS 白名单支持 dev tools 调试
+- [x] **V2.5.3 算法真相源统一**:`utils/spaced-repetition.js` 单一源 + `cloudfunctions/main/lib/` 同步副本,`scripts/sync-utils-to-cloud.js` + CI 校验 (`sync-utils:check`) 防 drift,23 项回归测试覆盖 Leitner 状态机/优先级/migrate 路径
+- [x] **V2.5.3 老字段退役**:`users.mastered_chars` 不再写入 (V2.1 假阳性污染字段),改用 `learning_progress.status` 判定"是否首次学";V2.3 防御性 fallback (learning_progress 查询失败时降级读 mastered_chars) 保留
+- [x] **V2.5.3 TTS 防护**:`getAudio` 24h URL 永久 cache (~4500 种 char+pinyin 组合),IP 限流 60/min TTS + 30/min ASR,防恶意调用刷爆百度配额
+- [x] **V2.5.3 main/index.js 拆模块**:2400 → 2006 行 (-16%),新增 `cloudfunctions/main/modules/{format,wechat,baidu,achievements}.js` 4 个模块
+- [x] **V2.5.3 文档体系**:`docs/CHANGELOG.md` (统一版本变更) + `docs/ADR/` 4 份架构决策记录 (B1 鉴权 / 算法真相源 / 老字段 / TTS) + `docs/ONBOARDING.md` (5 分钟入门)
+- [x] **V2.5.3 测试覆盖**:核心算法测试 0 → 62 项 (spaced-repetition 23 + error-classifier 16 + progressive-hint 12 + question-types 11),`npm test` 一键跑
+- [x] **V2.5.3 依赖清理**:删根 `package.json` 3 个未用 devDep (canvas 56M / xlsx / @cloudbase/database),`npm install` 从 56M → 0
+- [x] **V2.5.3 安全硬化**:`utils/logger.js` 自动脱敏 openid/token/secret/apiKey (字段名匹配 + 前 3+****+后 4),`users.token` 改存 SHA-256 hash (防御 DB 泄露),`scripts/setup-env.sh` 给 .env.local chmod 600
 
 ## 已修复Bug
 
