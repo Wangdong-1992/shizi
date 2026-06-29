@@ -3,10 +3,5 @@
     "test": "node --test utils/spaced-repetition.test.js utils/error-classifier.test.js utils/progressive-hint.test.js utils/question-types.test.js",
     "sync-utils": "node scripts/sync-utils-to-cloud.js",
     "sync-utils:check": "node scripts/sync-utils-to-cloud.js --check"
-  },
-  "devDependencies": {
-    "@cloudbase/database": "^1.4.3",
-    "canvas": "^3.2.3",
-    "xlsx": "^0.18.5"
   }
 }
