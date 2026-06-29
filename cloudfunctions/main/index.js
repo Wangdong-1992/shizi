@@ -51,8 +51,16 @@ if (!BAIDU_API_KEY || !BAIDU_SECRET_KEY) {
 const Format = require('./modules/format');
 const Wechat = require('./modules/wechat');
 const Baidu = require('./modules/baidu');
+const logger = require('../../utils/logger');
 const baidu = Baidu.createBaiduClient({ API_KEY: BAIDU_API_KEY, SECRET_KEY: BAIDU_SECRET_KEY });
 const fetchWxAccessToken = Wechat.createWxAccessTokenFetcher(WX_APPID, WX_APPSECRET);
+
+// V2.5.3: token 存 hash (P3-3 防御)
+//   当前 token 字段未校验 (死字段), 但未来如启用, 必须存 SHA-256 hash
+//   防止 DB 泄露时明文 token 被滥用
+function hashToken(plain) {
+  return crypto.createHash('sha256').update(String(plain)).digest('hex');
+}
 
 // 成就配置 (V2.5.3: 抽到 modules/achievements.js)
 const { ACHIEVEMENTS } = require('./modules/achievements');
@@ -167,24 +175,24 @@ exports.main = async (event, context) => {
         const userRes = await db.collection('users').where({ openid }).get();
 
         if (userRes.data && userRes.data.length > 0) {
-          // 存在 → 更新昵称头像和 token
+          // 存在 → 更新昵称头像和 token (P3-3: token 存 hash)
           await db.collection('users').where({ openid }).update({
             data: {
               nickname: nickname || userRes.data[0].nickname,
               avatar_url: avatar || userRes.data[0].avatar_url,
-              token: token,
+              token: hashToken(token),  // P3-3: 不存明文
               token_expire: tokenExpire,
               updated_at: new Date()
             }
           });
         } else {
-          // 不存在 → 新建用户
+          // 不存在 → 新建用户 (P3-3: token 存 hash)
           await db.collection('users').add({
             data: {
               openid,
               nickname: nickname || '小朋友',
               avatar_url: avatar || '',
-              token: token,
+              token: hashToken(token),  // P3-3: 不存明文
               token_expire: tokenExpire,
               star_count: 0,
               flower_count: 0,
@@ -198,7 +206,8 @@ exports.main = async (event, context) => {
           });
         }
 
-        console.log('wxLogin success, openid:', openid);
+        // P3-3: 用 logger 自动脱敏 openid, 避免明文落日志
+        logger.info('wxLogin success', { openid: openid });
         return { success: true, token, openid };
       }
 
@@ -1357,7 +1366,8 @@ exports.main = async (event, context) => {
         }
 
         await db.collection('users').where({ openid }).update({ data: updateData });
-        console.log('updateUserInfo success, openid:', openid, 'nickname:', nickname, 'age:', age);
+        // P3-3: logger 自动脱敏 openid / nickname
+        logger.info('updateUserInfo success', { openid: openid, nickname: nickname, age: age });
         return { success: true };
       }
 
