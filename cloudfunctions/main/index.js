@@ -48,6 +48,62 @@ if (!BAIDU_API_KEY || !BAIDU_SECRET_KEY) {
 let baiduAccessToken = null;
 let tokenExpireTime = 0;
 
+// ============================================================
+// TTS URL 缓存 + Rate Limit (P1-3, 2026-06-29 审计)
+// getAudio 在 PUBLIC_ACTIONS 白名单, 完全无鉴权, 任何人能调, 必须限流
+// TTS URL 永久 cache (字符有限, ~4500 种组合)
+// Rate limit 按 IP 限 (云函数实例内 in-memory, 简单防刷, 多实例下不严格)
+// ============================================================
+const TTS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 min
+const RATE_LIMIT_MAX_TTS = 60; // 每 IP 每分钟 60 次
+const RATE_LIMIT_MAX_ASR = 30; // ASR 更贵, 限更严
+const ttsUrlCache = new Map();
+const rateLimitBuckets = new Map();
+
+function getCachedTtsUrl(text) {
+  const hit = ttsUrlCache.get(text);
+  if (hit && hit.expiresAt > Date.now()) {
+    return hit.url;
+  }
+  return null;
+}
+
+function setCachedTtsUrl(text, url) {
+  ttsUrlCache.set(text, { url: url, expiresAt: Date.now() + TTS_CACHE_TTL });
+  // 防御性: 如果 cache 超过 10000 条, 清一半老的 (防止长期占用内存)
+  if (ttsUrlCache.size > 10000) {
+    let count = 0;
+    const targetDelete = 5000;
+    for (const key of ttsUrlCache.keys()) {
+      ttsUrlCache.delete(key);
+      if (++count >= targetDelete) break;
+    }
+  }
+}
+
+function checkRateLimit(key, max) {
+  const now = Date.now();
+  let bucket = rateLimitBuckets.get(key) || [];
+  // 清除过期时间戳
+  bucket = bucket.filter(function (t) { return now - t < RATE_LIMIT_WINDOW; });
+  if (bucket.length >= max) {
+    return false;
+  }
+  bucket.push(now);
+  rateLimitBuckets.set(key, bucket);
+  return true;
+}
+
+function getClientIp() {
+  // wxContext.CLIENTIP 在云函数中可用, 兜底 'unknown'
+  try {
+    return cloud.getWXContext().CLIENTIP || 'unknown';
+  } catch (e) {
+    return 'unknown';
+  }
+}
+
 // 间隔重复算法 END
 // ============================================================
 
@@ -1458,6 +1514,14 @@ exports.main = async (event, context) => {
         const { fileID, targetPinyin } = data;
         console.log('recognizeVoice called, fileID:', fileID, 'target:', targetPinyin);
 
+        // P1-3: ASR 比 TTS 更贵, 限更严 (30/min vs 60/min)
+        //   recognizeVoice 不在 PUBLIC_ACTIONS (走鉴权), 但仍防刷以保护百度 ASR 配额
+        const ipForAsr = getClientIp();
+        if (!checkRateLimit('asr:' + ipForAsr, RATE_LIMIT_MAX_ASR)) {
+          console.warn('[rate-limit] recognizeVoice 超限 ip:', ipForAsr);
+          return { success: false, reason: 'rate_limited' };
+        }
+
         try {
           // 下载音频文件（云存储 URL）
           const fileBuffer = await cloud.downloadFile({ fileID });
@@ -1501,19 +1565,33 @@ exports.main = async (event, context) => {
       case 'getAudio': {
         // 百度 TTS 文字转语音
         const { char, pinyin } = data;
-        console.log('getAudio called, char:', char, 'pinyin:', pinyin);
+        const text = char || pinyin || '';
+        if (!text) {
+          return { success: false, error: 'char 或 pinyin 必须传一个' };
+        }
+
+        // P1-3: Rate limit by IP (getAudio 是 PUBLIC_ACTIONS, 必须防刷)
+        const ip = getClientIp();
+        if (!checkRateLimit('tts:' + ip, RATE_LIMIT_MAX_TTS)) {
+          console.warn('[rate-limit] getAudio 超限 ip:', ip);
+          return { success: false, error: '请求过快, 请稍后再试' };
+        }
+
+        // P1-3: TTS URL cache hit (24h TTL, ~4500 种 char+pinyin 组合基本永久 cache)
+        const cachedUrl = getCachedTtsUrl(text);
+        if (cachedUrl) {
+          return { success: true, audioUrl: cachedUrl, message: 'cached' };
+        }
 
         try {
           // 获取 access token（复用一个）
           const accessToken = await getBaiduAccessToken();
 
-          // 构造要发音的文本（汉字或拼音）
-          const text = char || pinyin || '';
-
           // 调用百度 TTS API
           const ttsUrl = `https://tsn.baidu.com/text2audio?lan=zh&ctp=1&cuid=shizi&tok=${accessToken}&tex=${encodeURIComponent(text)}&vol=9&per=0&spd=5&pit=5&aue=3`;
 
-          console.log('TTS URL:', ttsUrl);
+          // P1-3: 缓存 URL (24h)
+          setCachedTtsUrl(text, ttsUrl);
 
           return {
             success: true,
