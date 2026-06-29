@@ -103,7 +103,7 @@ E:/claude/PMRD/shizi/
 
 ## 云函数接口 (main)
 
-> **当前数量：23 个 action**（截至 V2.4 阶段 2）。所有业务逻辑统一在 `cloudfunctions/main/index.js` 的 switch 路由里，按"用户/学习/复习/统计/语音/运维"六类分。
+> **当前数量：22 个 action**（V2.5.3）。所有业务逻辑统一在 `cloudfunctions/main/index.js` 的 switch 路由里，按"用户/学习/复习/统计/语音/运维"六类分。详细分组见 [docs/CHANGELOG.md](./CHANGELOG.md#22-个-action-分组)。
 
 | action | 说明 | 参数 |
 |--------|------|------|
@@ -286,7 +286,7 @@ this.setData(Object.assign({
 
 ### V2.5.2 修复批次（2026-06-24 ~ 06-25，共 26 个）
 
-**安全 / 鉴权（B1）**：21 个 action 信任客户端 `data.openid` → switch 入口强制 `wxContext.OPENID` 校验 + `PUBLIC_ACTIONS` 白名单（`getOptions`/`getQuestionOptions`/`getAudio` 无需 openid）+ `devMode + DEV_OPENIDS` 白名单 dev tools 调试。
+**安全 / 鉴权（B1）**：19 个用户 action 信任客户端 `data.openid` → switch 入口强制 `wxContext.OPENID` 校验 + `PUBLIC_ACTIONS` 白名单（`getOptions`/`getQuestionOptions`/`getAudio` 无需 openid）+ `devMode + DEV_OPENIDS` 白名单 dev tools 调试。22 个 action 中除 PUBLIC_ACTIONS 3 个外,其余 19 个走鉴权。
 
 **隐私日志（B3/B4）**：`getPhoneNumber` 手机号 `前3+****+后4` 脱敏；`wxLogin` 不再打印 token 明文。
 
@@ -313,7 +313,7 @@ this.setData(Object.assign({
 
 1. **ES5 语法**：对象回调用 `key: function(){}` 不用 `key(){}`，`var self = this` 模式，避免 `.bind()` 链式调用
 2. **openid 识别用户**：微信云开发通过 openid 标识用户
-3. **云函数统一入口**：main 云函数处理所有业务逻辑（**22 个 action**，V2.3），login 独立处理 openid 获取
+3. **云函数统一入口**：main 云函数处理所有业务逻辑（**22 个 action**，V2.5.3），login 独立处理 openid 获取。详细分组见 [docs/CHANGELOG.md](./CHANGELOG.md#22-个-action-分组)
 4. **奖励后端控制**：云函数返回奖励结果，前端展示
 5. **数据去重**：成就解锁使用幂等检查
 6. **集合命名**：成就记录集合名为 `achievement_log`（无s）
@@ -345,7 +345,7 @@ this.setData(Object.assign({
 - **已做止血**：V2.3 起改用 `process.env`，启动时校验。
 - **仍需用户做**：去微信公众平台/百度智能云后台**重置对应密钥**，并在云开发控制台配新值。老密钥视为已泄露。
 - **未来部署前**：若看到 `if (!process.env.XXX) throw` 风格的代码，新部署必须先配环境变量，否则会启动失败。
-- **V2.5.2 新增 B1 鉴权拦截**：21 个 action 入口强制 `wxContext.OPENID` 校验,防横向越权。**生产路径不接受任何 `data.openid` 伪造**(会被直接拒)。dev tools 调试走 `DEV_OPENIDS` 环境变量白名单 + 前端自动注入 `devMode: true`,**生产环境必须清空 `DEV_OPENIDS`**,否则任何持有合法 dev 工具账号的人都能绕过鉴权。
+- **V2.5.2 新增 B1 鉴权拦截**：22 个 action 中 19 个用户 action 入口强制 `wxContext.OPENID` 校验,防横向越权(PUBLIC_ACTIONS 3 个无 openid 跳过鉴权)。**生产路径不接受任何 `data.openid` 伪造**(会被直接拒)。dev tools 调试走 `DEV_OPENIDS` 环境变量白名单 + 前端自动注入 `devMode: true`,**生产环境必须清空 `DEV_OPENIDS`**,否则任何持有合法 dev 工具账号的人都能绕过鉴权。
 
 ## 🔧 云数据库索引（性能必需）
 
