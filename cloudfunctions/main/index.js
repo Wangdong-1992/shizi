@@ -276,9 +276,8 @@ exports.main = async (event, context) => {
           }
           totalLearnDays = Object.keys(dates).length;
 
-          // 今日统计
-          var todayObj3 = new Date();
-          var todayStr3 = todayObj3.getFullYear() + '-' + String(todayObj3.getMonth() + 1).padStart(2, '0') + '-' + String(todayObj3.getDate()).padStart(2, '0');
+          // 今日统计 (P3-1 二期: 用 Format.today() 替代内联)
+          var todayStr3 = Format.today();
           var todayNew = await db.collection('learning_progress')
             .where({ openid: openid, first_learn_date: todayStr3 })
             .get();
@@ -423,10 +422,9 @@ exports.main = async (event, context) => {
           //   - 今天已学过(lastDate == today): 沿用当前 streak, 不重复 +1
           //   - 昨天学的(lastDate == yesterday): streak + 1
           //   - 跳了 2 天以上: 重置为 1
-          const todayObj = new Date();
-          const todayStr = todayObj.getFullYear() + '-' + String(todayObj.getMonth() + 1).padStart(2, '0') + '-' + String(todayObj.getDate()).padStart(2, '0');
-          const yesterdayObj = new Date(todayObj.getTime() - 86400000);
-          const yesterdayStr = yesterdayObj.getFullYear() + '-' + String(yesterdayObj.getMonth() + 1).padStart(2, '0') + '-' + String(yesterdayObj.getDate()).padStart(2, '0');
+          // P3-1 二期: 用 Format.today() / Format.yesterday() 替代内联
+          const todayStr = Format.today();
+          const yesterdayStr = Format.yesterday();
           const lastDate = user.last_learn_date || '';
           let streak;
           if (!lastDate) {
@@ -484,10 +482,8 @@ exports.main = async (event, context) => {
         try {
           // 字符串化 charId(learning_progress.char_id 是 string)
           const charIdForProgress = charIdStr;
-          const todayObj3 = new Date();
-          const todayStr3 = todayObj3.getFullYear() + '-' +
-            String(todayObj3.getMonth() + 1).padStart(2, '0') + '-' +
-            String(todayObj3.getDate()).padStart(2, '0');
+          // P3-1 二期: Format.today() 替代内联
+          const todayStr3 = Format.today();
 
           // 查询是否已有 progress 记录
           const existProgressRes = await db.collection('learning_progress')
@@ -555,11 +551,8 @@ exports.main = async (event, context) => {
       case 'getDailyStats': {
         const { openid } = data;
 
-        var todayObj2 = new Date();
-        var todayYYYY2 = todayObj2.getFullYear();
-        var todayMM2 = String(todayObj2.getMonth() + 1).padStart(2, '0');
-        var todayDD2 = String(todayObj2.getDate()).padStart(2, '0');
-        var todayStr2 = todayYYYY2 + '-' + todayMM2 + '-' + todayDD2;
+        // P3-1 二期: Format.today() 替代内联
+        var todayStr2 = Format.today();
 
         var result2 = {
           dailyNewLearned: 0,
@@ -621,12 +614,8 @@ exports.main = async (event, context) => {
       case 'getPendingReview': {
         const { openid, limit = 10 } = data;
 
-        // 获取今日日期
-        var todayObj = new Date();
-        var todayYYYY = todayObj.getFullYear();
-        var todayMM = String(todayObj.getMonth() + 1).padStart(2, '0');
-        var todayDD = String(todayObj.getDate()).padStart(2, '0');
-        var today = todayYYYY + '-' + todayMM + '-' + todayDD;
+        // 获取今日日期 (P3-1 二期: Format.today() 替代内联)
+        var today = Format.today();
 
         // 查询 learning_progress：next_review_date <= today 或 next_review_date 为空
         var progressRecords = [];
@@ -1149,9 +1138,8 @@ exports.main = async (event, context) => {
         }
 
         try {
-          // --- 写2: 读/创建 learning_progress ---
-          var todayDate = new Date();
-          var todayStr = todayDate.getFullYear() + '-' + String(todayDate.getMonth() + 1).padStart(2, '0') + '-' + String(todayDate.getDate()).padStart(2, '0');
+          // --- 写2: 读/创建 learning_progress --- (P3-1 二期)
+          var todayStr = Format.today();
 
           var progressRes = await db.collection('learning_progress')
             .where({ openid: reviewOpenid, char_id: reviewCharId })
@@ -1486,8 +1474,8 @@ exports.main = async (event, context) => {
         var migratedCount = 0;
         var skippedCount = 0;
 
-        var migrateTodayObj = new Date();
-        var migrateToday = migrateTodayObj.getFullYear() + '-' + String(migrateTodayObj.getMonth() + 1).padStart(2, '0') + '-' + String(migrateTodayObj.getDate()).padStart(2, '0');
+        // P3-1 二期: Format.today() 替代内联
+        var migrateToday = Format.today();
 
         try {
           // 1. 获取 users 记录的 mastered_chars
@@ -1699,11 +1687,8 @@ exports.main = async (event, context) => {
       // V2.3 P1 改造:分批并行 + 同一天去重(避免定时器反复触发导致重复推送)
       case 'sendReviewReminder': {
         try {
-          var todayObj = new Date();
-          // 北京时间
-          var todayStr = todayObj.getFullYear() + '-' +
-            String(todayObj.getMonth() + 1).padStart(2, '0') + '-' +
-            String(todayObj.getDate()).padStart(2, '0');
+          // P3-1 二期: Format.today() 替代内联
+          var todayStr = Format.today();
 
           // 查询所有订阅了推送的用户
           var subscribedUsersRes = await db.collection('users')
