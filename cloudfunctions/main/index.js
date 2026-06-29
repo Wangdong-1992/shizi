@@ -554,15 +554,38 @@ exports.main = async (event, context) => {
         }
 
         const user = userRes.data[0];
-        let masteredChars = user.mastered_chars || [];
         const rewards = [];
 
         // 字符串化后比较，避免 id 和 _id 类型不一致导致重复添加
         const charIdStr = String(charId);
-        const alreadyMastered = masteredChars.some(id => String(id) === charIdStr);
+
+        // P0-2: 改用 learning_progress 判定"是否首次学", 不再读/写 users.mastered_chars
+        //   历史问题: users.mastered_chars 是 V2.1 假阳性污染的数组, V2.3 引入 learning_progress
+        //   作为新真相源, 但 recordLearn 仍向 mastered_chars push, 一旦 learning_progress 写入抛错
+        //   (B5 修复), mastered_chars 已 push, 出现"已掌握但不进复习队列"的双源不一致
+        //   修复: mastered_chars 降级为"防御性 fallback 读源", 不再主动写入
+        var alreadyMastered = false;
+        var masteredCount = 0;
+        try {
+          var existProgressForReward = await db.collection('learning_progress')
+            .where({ openid: openid, char_id: charIdStr })
+            .count();
+          alreadyMastered = existProgressForReward.total > 0;
+          // 顺便取 mastered_count (status in [familiar,mastered,solid]) 给成就解锁用
+          var masteredProgressRes = await db.collection('learning_progress')
+            .where({ openid: openid, status: _.in(['familiar', 'mastered', 'solid']) })
+            .limit(1000)
+            .get();
+          var uniqChars = new Set();
+          for (var mi = 0; mi < (masteredProgressRes.data || []).length; mi++) {
+            uniqChars.add(String(masteredProgressRes.data[mi].char_id || ''));
+          }
+          masteredCount = uniqChars.size;
+        } catch (checkErr) {
+          console.error('recordLearn: learning_progress 查询失败, 按首次处理:', checkErr.message);
+        }
 
         if (!alreadyMastered) {
-          masteredChars.push(charIdStr);
           rewards.push({ type: 'star', source: 'single_learn', amount: 1 });
 
           // M10: streak 跳天重置 (PRD: 连续学习)
@@ -598,7 +621,7 @@ exports.main = async (event, context) => {
 
           await db.collection('users').where({ openid }).update({
             data: {
-              mastered_chars: masteredChars,
+              // P0-2: mastered_chars 不再写入 (V2.5.3 退役, 只读 fallback)
               streak_count: streak,
               last_learn_date: new Date().toISOString().split('T')[0],
               last_learn_assisted: isAssisted ? new Date().toISOString() : null,
@@ -621,7 +644,7 @@ exports.main = async (event, context) => {
           }
 
           // 检查成就解锁
-          await checkAndUnlockAchievements(db, _, openid, masteredChars.length);
+          await checkAndUnlockAchievements(db, _, openid, masteredCount);
         }
 
         // ============================================================
