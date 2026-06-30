@@ -364,6 +364,20 @@ self.setData(Object.assign({
 | T20 | ESLint / Prettier 配置 | 🟢 P3 | 半天 | 单人 + AI 协作有 lint 更稳 |
 | T21 | review.js `closeFeedback` 定时器统一清理 | 🟢 P3 | 30min | 多个 setTimeout 满天飞 |
 
+### 8.1 现状更新(2026-06-30,V2.5.3 审计后)
+
+| ID | 状态 | 实际进展 |
+|---|---|---|
+| T13 | ✅ 完成(V2.5.2) | review.js 加 `resetReviewState` 公共方法,`showCurrentQuestion` 改用 `Object.assign({}, resetReviewState())` 模式(commit `913e0bd`) |
+| T14 | ⏸️ 待运维 | `learning_progress.{openid, status}` 复合索引仍是手动建,文档见 `docs/云数据库索引_runbook.md` 8 个索引清单 |
+| T15 | ✅ 完成(V2.5.2) | `sendReviewReminder` 改 BATCH_SIZE=10 并行 + 同一天去重防重推(commit `237d940`) |
+| T16 | ⚠️ 用户责任 | git 历史密钥清理需用户跑 `git filter-repo`,文档已在 `docs/CLAUDE.md` 安全注意事项标注,**不能代做** |
+| T17 | ✅ 部分完成(V2.5.3) | 主云函数 2400 → 2006 行 (-16%),新增 4 个 modules (format/wechat/baidu/achievements);彻底按域拆分留待后续 |
+| T18 | 🗑️ 废弃(V2.5.1) | `stroke-data.js` 等随描红功能删除而废弃,无需拆分 |
+| T19 | ⏸️ 未做 | `getMasteredChars` 仍硬删,V2.5.3 只退役了 `users.mastered_chars` 写入路径,读路径保留防御性 fallback |
+| T20 | ⏸️ 未做 | 项目无 ESLint/Prettier 配置,代码靠 review 保证风格;后续可加 husky + lint-staged |
+| T21 | ⏸️ 未做 | review.js `setTimeout` 仍散落(feedback / 答题切换 / 下一题),未统一清理;低优先级 P3 |
+
 ---
 
 ### 9. 共享知识(V2.3 新增)
