@@ -4,6 +4,10 @@ node_modules/
 .DS_Store
 
 # 密钥/环境变量 —— 绝对不能 commit
+# .env.local 含 WX_APPSECRET / BAIDU_API_KEY / BAIDU_SECRET_KEY 等生产凭据
+# git 不会 commit (本文件 ignore) 但本机失窃/误传/备份仍可能泄露
+# 部署推荐: CI/CD 注入云函数环境变量, 本地额外 chmod 600
+# 见 scripts/setup-env.sh
 .env
 .env.local
 .env.*.local
