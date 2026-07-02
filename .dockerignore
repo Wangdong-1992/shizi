@@ -1,0 +1,72 @@
+# =============================================================================
+# GEO Platform — Docker Build Context Ignore
+# =============================================================================
+# Optimizes Docker build context by excluding files not needed in the image.
+# The build context is the project root (docker-compose.yml uses context: ..)
+# =============================================================================
+
+# Version control
+.git
+.gitignore
+
+# IDE / editor configs
+.idea
+.vscode
+.fleet
+.zed
+.cursor
+.codex
+.gemini
+.mcp.json
+
+# WorkBuddy / CodeBuddy internal
+.workbuddy
+.codebuddy
+
+# Documentation outputs (HTML prototypes, reports, etc.)
+outputs/
+
+# Deliverables (architecture docs, diagrams)
+deliverables/
+
+# Docker data (persisted volumes)
+docker-data/
+
+# Management layer dev artifacts
+management-layer/node_modules
+management-layer/dist
+management-layer/.env
+management-layer/.env.*
+!management-layer/.env.example
+
+# Frontend dev artifacts
+frontend/node_modules
+frontend/.next
+frontend/.env.local
+frontend/.env.*.local
+
+# GEOFlow dev artifacts (the geoflow-engine/.dockerignore also applies within)
+geoflow-engine/.git
+geoflow-engine/vendor
+geoflow-engine/node_modules
+geoflow-engine/storage/app/public/*
+geoflow-engine/storage/app/private/*
+geoflow-engine/storage/logs/*
+geoflow-engine/storage/framework/cache/*
+geoflow-engine/storage/framework/sessions/*
+geoflow-engine/storage/framework/testing/*
+geoflow-engine/storage/framework/views/*
+geoflow-engine/bootstrap/cache/*
+geoflow-engine/bak
+geoflow-engine/docker-compose*.yml
+geoflow-engine/.env
+geoflow-engine/.env.prod
+geoflow-engine/.env.backup
+geoflow-engine/.env.production
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

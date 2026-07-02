@@ -1,0 +1,114 @@
+# =============================================================================
+# GEO Platform — Render Deployment Config (方案A: Management + Frontend)
+# =============================================================================
+# 部署步骤：
+# 1. 推送代码到 GitHub
+# 2. 在 Render Dashboard 创建 PostgreSQL + Redis (免费版)
+# 3. 导入此 render.yaml 或手动创建 Web Services
+# =============================================================================
+
+databases:
+  # PostgreSQL (免费版 1GB)
+  - name: geo-postgres
+    databaseName: geo_platform
+    user: geo
+    # 密码自动生成
+
+redis:
+  # Redis (免费版 30MB)
+  - name: geo-redis
+    ipVersion: IPv4
+
+services:
+  # ---------------------------------------------------------------------------
+  # Management Layer — Node.js + Fastify API
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: geo-management
+    env: node
+    region: oregon
+    # 从 management-layer 目录构建
+    buildCommand: |
+      cd management-layer
+      npm install
+      npm run prisma:generate
+      npm run build
+    startCommand: cd management-layer && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: JWT_ISSUER
+        value: geo-management
+      - key: DATABASE_URL
+        fromDatabase:
+          name: geo-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: geo-redis
+          type: redis
+          property: connectionString
+      - key: CORS_ORIGINS
+        value: https://geo-frontend.onrender.com
+      - key: LOG_LEVEL
+        value: info
+      - key: OPENAI_API_KEY
+        sync: false
+    # 健康检查
+    healthCheckPath: /health
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Next.js 15 + React 19
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: geo-frontend
+    env: node
+    region: oregon
+    # 从 frontend 目录构建
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+    startCommand: cd frontend && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: NEXT_PUBLIC_API_URL
+        value: https://geo-management.onrender.com
+    # 健康检查
+    healthCheckPath: /
+
+# =============================================================================
+# 部署说明
+# =============================================================================
+#
+# 方式1: 自动导入 (推荐)
+#   1. 访问 https://dashboard.render.com/blueprints/new
+#   2. 连接到你的 GitHub 仓库
+#   3. 选择此 render.yaml 文件
+#   4. 点击 "Apply Blueprint"
+#
+# 方式2: 手动创建
+#   1. Dashboard → New → PostgreSQL (Free)
+#   2. Dashboard → New → Redis (Free)
+#   3. Dashboard → New → Web Service (geo-management)
+#   4. 设置环境变量 DATABASE_URL 和 REDIS_URL
+#   5. Dashboard → New → Web Service (geo-frontend)
+#
+# 部署完成后:
+#   - 前端: https://geo-frontend.onrender.com
+#   - API: https://geo-management.onrender.com
+#
+# 注意事项:
+#   - 免费版 PostgreSQL 会在 90 天后休眠，需手动唤醒
+#   - 免费版 Redis 会在 30 天无活动后删除
+#   - 需要配置 OPENAI_API_KEY 才能使用 AI 功能
+# =============================================================================

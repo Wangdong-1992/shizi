@@ -1,0 +1,303 @@
+// =============================================================================
+// GEO Platform — Prisma Schema (Management Layer)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Platform operator (admin or staff user who logs in to the management UI).
+model Operator {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("OPERATOR")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("management_operators")
+}
+
+/// Client (customer business) managed by the platform.
+model Client {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  brandName   String?  @map("brand_name")
+  websiteUrl  String?  @map("website_url")
+  industry    String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("management_clients")
+}
+
+/// Knowledge entry — tenant-scoped content organized by category.
+/// Published entries are chunked → embedded → stored in KnowledgeChunk for vector search.
+model KnowledgeEntry {
+  id             String   @id @default(uuid()) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  category       String   // enterprise_info | product_info | process | certification | faq | industry_knowledge | contact | news | customer_case | core_attributes
+  title          String
+  content        String   @db.Text
+  contentHtml    String?  @map("content_html") @db.Text
+  source         String?
+  confidence     Float?
+  riskLevel      String?  @map("risk_level")
+  version        Int      @default(1)
+  status         String   @default("draft")  // draft | published | archived
+  publishedAt    DateTime? @map("published_at")
+  geoflowKbId    String?  @map("geoflow_kb_id") @db.Uuid
+  geoflowSyncedAt DateTime? @map("geoflow_synced_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  chunks         KnowledgeChunk[]
+
+  @@map("management_knowledge_entries")
+  @@index([clientId, category])
+  @@index([clientId, status])
+  @@index([category])
+}
+
+/// Knowledge chunk — a segment of a published entry with a vector embedding for similarity search.
+model KnowledgeChunk {
+  id         String   @id @default(uuid()) @db.Uuid
+  entryId    String   @map("entry_id") @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  chunkIndex Int      @map("chunk_index")
+  chunkText  String   @map("chunk_text") @db.Text
+  tokenCount Int?     @map("token_count")
+  embedding  Unsupported("vector(1536)")?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  entry      KnowledgeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("management_knowledge_chunks")
+  @@index([entryId])
+  @@index([clientId])
+}
+
+/// AI-generated content draft (Q&A or article format).
+/// Created by content generation service, reviewed by human operators.
+/// Key constraint: geoScore and aiRatio are NEVER modified by review.
+model ContentDraft {
+  id                String   @id @default(uuid()) @db.Uuid
+  clientId          String   @map("client_id") @db.Uuid
+  title             String                       // Q&A 格式标题（15-30字长问句）
+  content           String   @db.Text            // 生成的内容正文
+  format            String   @default("qa")      // qa | article
+  schemaJson        Json?    @map("schema_json") // FAQPage JSON-LD
+  status            String   @default("draft")   // draft | generating | review | approved | rejected
+  geoScore          Int?     @map("geo_score")   // 编辑器质量评分（审核不改分）
+  aiRatio           Int?     @map("ai_ratio")    // AI 生成占比 0-100（审核不改）
+  origResearchTypes String[] @map("orig_research_types") @default([])
+  factRefs          Json?    @map("fact_refs")   // [{ entryId, chunkIndex, entryTitle }]
+  words             Int?                         // 字数
+  generationPrompt  String?  @map("generation_prompt")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  reviews           HumanReview[]
+
+  @@map("management_content_drafts")
+  @@index([clientId, status])
+}
+
+/// Human review record — 6-dimension checklist + operator signature.
+/// Does NOT modify ContentDraft.geoScore or aiRatio (forced human-review-no-score-change rule).
+model HumanReview {
+  id              String   @id @default(uuid()) @db.Uuid
+  draftId         String   @map("draft_id") @db.Uuid
+  operatorId      String   @map("operator_id") @db.Uuid
+  checklist       Json                         // { accuracy, gain, brand, compliance, eeat, readability }
+  signature       String                       // 审核人姓名
+  aiRatioAtReview Int?     @map("ai_ratio_at_review") // snapshot of draft.aiRatio at review time
+  passed          Boolean
+  reviewedAt      DateTime @default(now()) @map("reviewed_at")
+
+  draft           ContentDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@map("management_human_reviews")
+  @@index([draftId])
+}
+
+/// Five-dimension GEO score (v5.0 formula).
+/// Cascade: Production = √(D1×D2) → Reach → Effective → GEO = 0.50×Effective + 0.50×D5
+model GeoScore {
+  id            String   @id @default(uuid()) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  d1Intent      Int      @map("d1_intent")
+  d2Eeat        Int      @map("d2_eeat")
+  d3Reach       Int      @map("d3_reach")
+  d4Compete     Int      @map("d4_compete")
+  d5Impact      Int      @map("d5_impact")
+  geoScore      Float    @map("geo_score")
+  production    Float    @default(0)
+  reach         Float    @default(0)
+  effective     Float    @default(0)
+  scoreVersion  String   @default("v5.0") @map("score_version")
+  isBaseline    Boolean  @default(false) @map("is_baseline")
+  calculatedAt  DateTime @default(now()) @map("calculated_at")
+
+  eeat          EeatAssessment?
+  mindMetrics   MindMetric[]
+
+  @@map("management_geo_scores")
+  @@index([clientId, calculatedAt(sort: Desc)])
+}
+
+/// E-E-A-T four-subdimension assessment.
+model EeatAssessment {
+  id               String @id @default(uuid()) @db.Uuid
+  scoreId          String @map("score_id") @db.Uuid @unique
+  experience       Int    @default(0)
+  expertise        Int    @default(0)
+  authoritativeness Int   @default(0)
+  trustworthiness  Int    @default(0)
+
+  score            GeoScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  @@map("management_eeat_assessments")
+}
+
+/// Mindshare metrics per AI platform.
+model MindMetric {
+  id             String   @id @default(uuid()) @db.Uuid
+  scoreId        String   @map("score_id") @db.Uuid
+  platform       String                        // chatgpt | google | deepseek | doubao
+  sentiment      Int      @default(0)
+  depth          Int      @default(0)
+  brandAssoc     Int      @default(0) @map("brand_assoc")
+
+  score          GeoScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  @@map("management_mind_metrics")
+}
+
+/// Direct path channel — 6 SEO/information discovery paths.
+/// All are status-tracked only (non-automated). BullMQ checks daily at 6:00 AM.
+model DirectPath {
+  id           String   @id @default(uuid()) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  pathType     String   // llms_txt | baidu_baike | baidu_agent | sogou_baike | wikidata | qichacha
+  label        String
+  url          String?
+  status       String   @default("pending")  // pending | active | error | not_applicable
+  lastChecked  DateTime? @map("last_checked")
+  errorMessage String?  @map("error_message")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("management_direct_paths")
+  @@index([clientId, pathType])
+}
+
+/// AI crawler visit log — captured by crawler-detector Fastify plugin.
+model AiCrawlerLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  crawler    String   // gptbot | googlebot | claudebot | bytespider | bingbot | commoncrawl | other
+  ua         String   @db.Text
+  path       String
+  ip         String?
+  statusCode Int?     @map("status_code")
+  visitedAt  DateTime @default(now()) @map("visited_at")
+
+  @@map("management_ai_crawler_logs")
+  @@index([clientId, crawler])
+  @@index([clientId, visitedAt(sort: Desc)])
+}
+
+/// Brand mention detection — 20 questions × 4 platforms, collected by BullMQ.
+model EntityMention {
+  id         String   @id @default(uuid()) @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  platform   String   // chatgpt | google | deepseek | doubao
+  query      String
+  mentioned  Boolean  @default(false)
+  position   String?  // first_half | second_half | footnote
+  sentiment  String?  // positive | neutral | negative
+  depth      String?  // brief | medium | detailed
+  checkedAt  DateTime @default(now()) @map("checked_at")
+
+  @@map("management_entity_mentions")
+  @@index([clientId, platform])
+  @@index([clientId, checkedAt(sort: Desc)])
+}
+
+/// Score change log — records when auto-scoring results in a significant score change.
+model ScoreChangeLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  scoreId       String   @map("score_id") @db.Uuid
+  previousScore Float?   @map("previous_score")
+  newScore      Float    @map("new_score")
+  reason        String
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("management_score_change_logs")
+  @@index([clientId, createdAt(sort: Desc)])
+}
+
+/// External source profile — one per source per client (5 sources).
+model SourceProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  source      String   // baidu_baike | qichacha | alibaba_1688 | industry_yellowpage | gov_registry
+  sourceUrl   String?  @map("source_url")
+  rawData     Json?    @map("raw_data")
+  lastScanned DateTime? @map("last_scanned")
+  status      String   @default("pending")  // pending | success | failed | manual_only
+  errorMsg    String?  @map("error_msg")
+
+  consistencies SourceConsistency[]
+
+  @@map("management_source_profiles")
+  @@unique([clientId, source])
+}
+
+/// Field-level consistency check between our knowledge base and external source.
+model SourceConsistency {
+  id          String   @id @default(uuid()) @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  profileId   String   @map("profile_id") @db.Uuid
+  fieldName   String   @map("field_name")
+  ourValue    String?  @map("our_value")
+  theirValue  String?  @map("their_value")
+  normalized  Boolean  @default(false)
+  conflict    String?  // critical | warning | info | consistent
+  checkedAt   DateTime @default(now()) @map("checked_at")
+
+  profile     SourceProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  actions     ConsistencyAction[]
+
+  @@map("management_source_consistency")
+  @@index([clientId, conflict])
+}
+
+/// Action item for resolving consistency conflicts.
+model ConsistencyAction {
+  id            String   @id @default(uuid()) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  consistencyId String   @map("consistency_id") @db.Uuid
+  priority      String   @default("P1")  // P0 | P1 | P2
+  action        String
+  status        String   @default("pending")  // pending | in_progress | done | dismissed
+  note          String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  consistency   SourceConsistency @relation(fields: [consistencyId], references: [id], onDelete: Cascade)
+
+  @@map("management_consistency_actions")
+}

@@ -1,0 +1,203 @@
+# =============================================================================
+# GEO Platform — Docker Compose (Base)
+# =============================================================================
+# 6 services: postgres, redis, geoflow, management, frontend, nginx
+# All services share the same Docker network: geo-network
+#
+# ⚠️  SECURITY: Run `cp .env.example .env` and customize values before deploying!
+#    Never use default values in production - they are insecure.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 + pgvector (official pgvector image)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: geo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geo_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-geo}
+      # P0-10 FIX: No default password - must be set in .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - geo-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-geo} -d ${POSTGRES_DB:-geo_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 (Alpine)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: geo-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - geo-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # GEOFlow — PHP 8.3-FPM + Laravel 12 (T02: Full Fork with RLS + JWT)
+  # ---------------------------------------------------------------------------
+  geoflow:
+    build:
+      context: ..
+      dockerfile: docker/geoflow/Dockerfile
+    container_name: geo-geoflow
+    restart: unless-stopped
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: ${POSTGRES_HOST:-postgres}
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_DATABASE: ${POSTGRES_DB:-geo_platform}
+      DB_USERNAME: ${POSTGRES_USER:-geo}
+      # P0-10 FIX: No default password - must be set in .env
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # P0-10 FIX: No default JWT secret - must be set in .env
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: geo-management
+      APP_ENV: local
+      APP_DEBUG: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - geo-network
+    healthcheck:
+      # P0-6 FIX: Use FastCGI HTTP probe instead of php-fpm -t (config-only check).
+      # The Laravel /api/health endpoint verifies actual application readiness.
+      test: ["CMD-SHELL", "SCRIPT_NAME=/api/health SCRIPT_FILENAME=/var/www/html/public/index.php REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Management Layer — Node.js 20 + TypeScript + Fastify (T03: Full Implementation)
+  # ---------------------------------------------------------------------------
+  management:
+    build:
+      context: ..
+      dockerfile: docker/management/Dockerfile
+    container_name: geo-management
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      # P0-10 FIX: No default password in DATABASE_URL - must be set in .env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-geo}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-geo_platform}?schema=public
+      # P0-10 FIX: No default JWT secret - must be set in .env
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      JWT_ISSUER: geo-management
+      GEOFLOW_API_URL: http://nginx/api
+      PORT: 3001
+      HOST: 0.0.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "${MANAGEMENT_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - geo-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Next.js 15 + React 19 (T04: Full Implementation)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend/Dockerfile
+    container_name: geo-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://nginx:8080}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - management
+    networks:
+      - geo-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Nginx — Reverse Proxy (1.27-alpine)
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: geo-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - geoflow
+      - management
+      - frontend
+    networks:
+      - geo-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  geo-network:
+    driver: bridge
+    name: geo-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  pgdata:
+    name: geo-pgdata
+  redisdata:
+    name: geo-redisdata

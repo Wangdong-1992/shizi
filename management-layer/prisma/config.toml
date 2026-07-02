@@ -1,0 +1,9 @@
+# =============================================================================
+# Prisma Configuration
+# =============================================================================
+# The migrations table is renamed to avoid conflicts with Laravel's
+# "migrations" table in the shared database.
+# =============================================================================
+
+[migrate]
+migrationsTable = "management_prisma_migrations"
